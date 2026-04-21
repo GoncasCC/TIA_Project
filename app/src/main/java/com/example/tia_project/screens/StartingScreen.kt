@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.tia_project.sensors.AccelerometerManager
+import com.example.tia_project.sensors.MotionData
 
 
 @Composable
@@ -16,21 +17,37 @@ fun StartingScreen() {
     val context = LocalContext.current
 
     var started by remember { mutableStateOf(false) }
-    var sensorText by remember { mutableStateOf("Accelerometer values will appear here") }
+    var motionData by remember {
+        mutableStateOf(
+            MotionData(
+                x = 0f,
+                y = 0f,
+                z = 0f,
+                magnitude = 0f,
+                linearMagnitude = 0f,
+                state = "Not started"
+            )
+        )
+    }
+
+    var statusText by remember { mutableStateOf("Accelerometer values will appear here") }
 
     val accelerometerManager = remember {
-        AccelerometerManager(context) { x, y, z ->
-            sensorText = "X: %.2f\nY: %.2f\nZ: %.2f".format(x, y, z)
+        AccelerometerManager(context) { newData ->
+            motionData = newData
         }
     }
 
     DisposableEffect(started) {
         if (started) {
             if (accelerometerManager.isSensorAvailable()) {
+                statusText = "Accelerometer started"
                 accelerometerManager.startListening()
             } else {
-                sensorText = "This device does not have an accelerometer."
+                statusText = "This device does not have an accelerometer."
             }
+        } else {
+            accelerometerManager.stopListening()
         }
 
         onDispose {
@@ -54,10 +71,7 @@ fun StartingScreen() {
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
-                onClick = {
-                    started = true
-                    sensorText = "Starting accelerometer..."
-                },
+                onClick = { started = true },
                 enabled = !started
             ) {
                 Text("Start")
@@ -66,7 +80,7 @@ fun StartingScreen() {
             Button(
                 onClick = {
                     started = false
-                    sensorText = "Accelerometer stopped."
+                    statusText = "Accelerometer stopped"
                 },
                 enabled = started
             ) {
@@ -76,10 +90,33 @@ fun StartingScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = sensorText,
-            style = MaterialTheme.typography.bodyLarge
-        )
+        if (!started) {
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        } else {
+            Text(
+                text = """
+                    X: %.2f
+                    Y: %.2f
+                    Z: %.2f
+                    
+                    Magnitude: %.2f
+                    Linear movement: %.2f
+                    
+                    State: %s
+                """.trimIndent().format(
+                    motionData.x,
+                    motionData.y,
+                    motionData.z,
+                    motionData.magnitude,
+                    motionData.linearMagnitude,
+                    motionData.state
+                ),
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
     }
 }
 
