@@ -153,8 +153,9 @@ class MainActivity : ComponentActivity() {
                     onCancel = { cancelSetup() }
                 )
 
-                "progress" -> SimpleTextScreen(
-                    text = "Progress",
+                "progress" -> ProgressScreen(
+                    voiceoverEnabled = voiceoverEnabled,
+                    vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
                     onBack = { goToMenu() }
                 )
