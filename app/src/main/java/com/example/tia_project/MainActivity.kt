@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
             var selectedActivity by remember { mutableStateOf("") }
             var selectedGoalType by remember { mutableStateOf("") }
             var selectedGoalValue by remember { mutableStateOf("") }
+            var selectedDifficulty by remember { mutableStateOf("") }
 
             var voiceoverEnabled by remember { mutableStateOf(true) }
             var musicEnabled by remember { mutableStateOf(true) }
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
                 selectedActivity = ""
                 selectedGoalType = ""
                 selectedGoalValue = ""
+                selectedDifficulty = ""
                 goToMenu()
             }
 
@@ -65,19 +67,13 @@ class MainActivity : ComponentActivity() {
 
                 "menu" -> key(menuInstance) {
                     MenuScreen(
-                        onStartNewSession = {
-                            currentScreen = "activity"
-                        },
-                        onProgress = {
-                            currentScreen = "progress"
-                        },
+                        onStartNewSession = { currentScreen = "activity" },
+                        onProgress = { currentScreen = "progress" },
                         onGuide = {
                             showReopenGuideMessage = false
                             currentScreen = "guide"
                         },
-                        onOptions = {
-                            currentScreen = "options"
-                        },
+                        onOptions = { currentScreen = "options" },
                         voiceoverEnabled = voiceoverEnabled,
                         vibrationEnabled = vibrationEnabled,
                         darkModeEnabled = darkModeEnabled
@@ -93,9 +89,7 @@ class MainActivity : ComponentActivity() {
                     onMusicChange = { musicEnabled = it },
                     onVibrationChange = { vibrationEnabled = it },
                     onDarkModeChange = { darkModeEnabled = it },
-                    onBack = {
-                        goToMenu()
-                    }
+                    onBack = { goToMenu() }
                 )
 
                 "activity" -> ActivityScreen(
@@ -106,9 +100,7 @@ class MainActivity : ComponentActivity() {
                         selectedActivity = activity
                         currentScreen = "goalType"
                     },
-                    onCancel = {
-                        cancelSetup()
-                    }
+                    onCancel = { cancelSetup() }
                 )
 
                 "goalType" -> GoalTypeScreen(
@@ -119,12 +111,8 @@ class MainActivity : ComponentActivity() {
                         selectedGoalType = goalType
                         currentScreen = "goalValue"
                     },
-                    onBack = {
-                        currentScreen = "activity"
-                    },
-                    onCancel = {
-                        cancelSetup()
-                    }
+                    onBack = { currentScreen = "activity" },
+                    onCancel = { cancelSetup() }
                 )
 
                 "goalValue" -> GoalValueScreen(
@@ -134,36 +122,41 @@ class MainActivity : ComponentActivity() {
                     darkModeEnabled = darkModeEnabled,
                     onNext = { goalValue ->
                         selectedGoalValue = goalValue
+                        currentScreen = "difficulty"
+                    },
+                    onBack = { currentScreen = "goalType" },
+                    onCancel = { cancelSetup() }
+                )
+
+                "difficulty" -> DifficultyScreen(
+                    voiceoverEnabled = voiceoverEnabled,
+                    vibrationEnabled = vibrationEnabled,
+                    darkModeEnabled = darkModeEnabled,
+                    onNext = { difficulty ->
+                        selectedDifficulty = difficulty
                         currentScreen = "summary"
                     },
-                    onBack = {
-                        currentScreen = "goalType"
-                    },
-                    onCancel = {
-                        cancelSetup()
-                    }
+                    onBack = { currentScreen = "goalValue" },
+                    onCancel = { cancelSetup() }
                 )
 
                 "summary" -> SummaryScreen(
                     activity = selectedActivity,
                     goalValue = selectedGoalValue,
+                    difficulty = selectedDifficulty,
                     voiceoverEnabled = voiceoverEnabled,
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
                     onStart = {
                         // TODO: ir para o ecrã da sessão depois
                     },
-                    onCancel = {
-                        cancelSetup()
-                    }
+                    onCancel = { cancelSetup() }
                 )
 
                 "progress" -> SimpleTextScreen(
                     text = "Progress",
                     darkModeEnabled = darkModeEnabled,
-                    onBack = {
-                        goToMenu()
-                    }
+                    onBack = { goToMenu() }
                 )
 
                 "guide" -> GuideScreen(
@@ -175,7 +168,6 @@ class MainActivity : ComponentActivity() {
                         prefs.edit()
                             .putBoolean("has_seen_guide", true)
                             .apply()
-
                         showReopenGuideMessage = false
                         goToMenu()
                     }
@@ -200,16 +192,11 @@ fun SimpleTextScreen(
             .background(backgroundColor)
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onLongPress = {
-                        onBack()
-                    }
+                    onLongPress = { onBack() }
                 )
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            color = textColor
-        )
+        Text(text = text, color = textColor)
     }
 }

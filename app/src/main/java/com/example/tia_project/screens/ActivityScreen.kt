@@ -405,9 +405,207 @@ private fun String.toReadableText(): String {
 }
 
 @Composable
+fun DifficultyScreen(
+    voiceoverEnabled: Boolean,
+    vibrationEnabled: Boolean,
+    darkModeEnabled: Boolean,
+    onNext: (String) -> Unit,
+    onBack: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val options = listOf("EASY", "MEDIUM", "HARD")
+    val colorForOption = mapOf(
+        "EASY" to Color(0xFF00C853),
+        "MEDIUM" to Color(0xFFFFCC00),
+        "HARD" to Color(0xFFD50000)
+    )
+
+    var selectedIndex by remember { mutableStateOf(0) }
+    var dragAmountTotal by remember { mutableStateOf(0f) }
+    var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
+
+    val selectedOption = options[selectedIndex]
+    val context = LocalContext.current
+    val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
+
+    val vibrator = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager =
+                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
+    val vibrate: (Long) -> Unit = remember(vibrator, vibrationEnabled) {
+        { duration ->
+            if (vibrationEnabled) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(
+                        VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(duration)
+                }
+            }
+        }
+    }
+
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var isTtsReady by remember { mutableStateOf(false) }
+
+    fun speak(text: String, id: String) {
+        if (isTtsReady && voiceoverEnabled) {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val textToSpeech = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                isTtsReady = true
+            }
+        }
+        tts = textToSpeech
+        textToSpeech.language = Locale.US
+        onDispose {
+            textToSpeech.stop()
+            textToSpeech.shutdown()
+        }
+    }
+
+    LaunchedEffect(selectedOption, isTtsReady, voiceoverEnabled) {
+        speak(
+            "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
+            "difficulty_$selectedOption"
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .pointerInput(selectedOption, vibrationEnabled, voiceoverEnabled) {
+                coroutineScope {
+                    launch {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                vibrate(150)
+                                speak("Selected.", "selected")
+                                launch {
+                                    delay(500)
+                                    onNext(selectedOption)
+                                }
+                            },
+                            onLongPress = {
+                                vibrate(400)
+                                speak("Cancelled. Going back to menu.", "cancelled")
+                                launch {
+                                    delay(2000)
+                                    onCancel()
+                                }
+                            }
+                        )
+                    }
+
+                    launch {
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                dragAmountTotal = 0f
+                                hasChangedOptionThisSwipe = false
+                            },
+                            onDragEnd = {
+                                dragAmountTotal = 0f
+                                hasChangedOptionThisSwipe = false
+                            },
+                            onDragCancel = {
+                                dragAmountTotal = 0f
+                                hasChangedOptionThisSwipe = false
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragAmountTotal += dragAmount
+
+                            if (!hasChangedOptionThisSwipe) {
+                                if (dragAmountTotal > 120f) {
+                                    selectedIndex =
+                                        if (selectedIndex == 0) options.lastIndex else selectedIndex - 1
+                                    vibrate(30)
+                                    hasChangedOptionThisSwipe = true
+                                }
+                                if (dragAmountTotal < -120f) {
+                                    selectedIndex =
+                                        if (selectedIndex == options.lastIndex) 0 else selectedIndex + 1
+                                    vibrate(30)
+                                    hasChangedOptionThisSwipe = true
+                                }
+                            }
+                        }
+                    }
+
+                    launch {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val pressedPointers = event.changes.filter { it.pressed }
+                                if (pressedPointers.size == 2) {
+                                    val horizontalMove = pressedPointers
+                                        .sumOf { it.positionChange().x.toDouble() }
+                                        .toFloat()
+                                    if (horizontalMove > 80f || horizontalMove < -80f) {
+                                        vibrate(60)
+                                        speak("Go back.", "go_back")
+                                        launch {
+                                            delay(500)
+                                            onBack()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 40.dp)
+        ) {
+            Text(
+                text = "LEVEL",
+                color = if (darkModeEnabled) Color.White else Color.Black,
+                fontSize = 82.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+            )
+
+            Text(
+                text = selectedOption,
+                color = colorForOption[selectedOption] ?: Color.White,
+                fontSize = 96.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+            )
+        }
+    }
+}
+
+@Composable
 fun SummaryScreen(
     activity: String,
     goalValue: String,
+    difficulty: String,
     voiceoverEnabled: Boolean,
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
@@ -472,7 +670,7 @@ fun SummaryScreen(
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
         if (isTtsReady && voiceoverEnabled) {
             tts?.speak(
-                "You selected $activity. Goal: $goalValue.",
+                "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 "summary1"
