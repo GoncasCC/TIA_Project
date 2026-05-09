@@ -162,27 +162,44 @@ fun ProgressScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 16.dp, vertical = 40.dp)
         ) {
             Text(
-                text = selectedPeriod,
+                text = "PROGRESS",
                 color = greenColor,
-                fontSize = 52.sp,
+                fontSize = 66.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                maxLines = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
             )
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 80.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = selectedPeriod,
+                    color = greenColor,
+                    fontSize = 52.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+
+                Spacer(modifier = Modifier.height(70.dp))
+
                 Text(
                     text = String.format(Locale.US, "%.2f KM", progressData.totalDistanceKm),
                     color = textColor,
-                    fontSize = 70.sp,
+                    fontSize = 48.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
@@ -202,19 +219,11 @@ fun ProgressScreen(
                 Text(
                     text = "SESSIONS: ${progressData.totalSessions}",
                     color = textColor,
-                    fontSize = 38.sp,
+                    fontSize = 48.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
             }
-
-            Text(
-                text = "Swipe with one finger for more progress details.\nSwipe with two fingers to go back.",
-                color = textColor,
-                fontSize = 24.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
@@ -293,26 +302,22 @@ private fun ProgressData.toSpeechText(period: String): String {
 
 private fun Int.toReadableDuration(): String {
     val hours = this / 3600
-    val minutes = (this % 3600) / 60
-    val seconds = this % 60
+    val minutes = this / 60
 
     return when {
-        hours > 0 -> String.format(Locale.US, "%dH %02dM", hours, minutes)
-        minutes > 0 -> String.format(Locale.US, "%dM %02dS", minutes, seconds)
-        else -> String.format(Locale.US, "%dS", seconds)
+        hours > 0 -> String.format(Locale.US, "%dH %02dM", hours, minutes % 60)
+        else -> String.format(Locale.US, "%d MIN", minutes)
     }
 }
 
 private fun Int.toReadableDurationForSpeech(): String {
     val hours = this / 3600
-    val minutes = (this % 3600) / 60
-    val seconds = this % 60
+    val minutes = this / 60
 
     return when {
-        hours > 0 && minutes > 0 -> "$hours hour${if (hours == 1) "" else "s"} and $minutes minute${if (minutes == 1) "" else "s"}"
+        hours > 0 && minutes % 60 > 0 -> "$hours hour${if (hours == 1) "" else "s"} and ${minutes % 60} minute${if (minutes % 60 == 1) "" else "s"}"
         hours > 0 -> "$hours hour${if (hours == 1) "" else "s"}"
-        minutes > 0 && seconds > 0 -> "$minutes minute${if (minutes == 1) "" else "s"} and $seconds second${if (seconds == 1) "" else "s"}"
         minutes > 0 -> "$minutes minute${if (minutes == 1) "" else "s"}"
-        else -> "$seconds second${if (seconds == 1) "" else "s"}"
+        else -> "0 minutes"
     }
 }
