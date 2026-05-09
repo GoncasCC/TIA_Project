@@ -148,7 +148,7 @@ class MainActivity : ComponentActivity() {
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
                     onStart = {
-                        // TODO: ir para o ecrã da sessão depois
+                        currentScreen = "training"
                     },
                     onCancel = { cancelSetup() }
                 )
@@ -171,6 +171,18 @@ class MainActivity : ComponentActivity() {
                         showReopenGuideMessage = false
                         goToMenu()
                     }
+                )
+
+                "training" -> TrainingSession(
+                    activity = selectedActivity,
+                    goalType = selectedGoalType,
+                    goalValue = selectedGoalValue,
+                    difficulty = selectedDifficulty,
+                    voiceoverEnabled = voiceoverEnabled,
+                    vibrationEnabled = vibrationEnabled,
+                    darkModeEnabled = darkModeEnabled,
+                    onFinish = { goToMenu() },
+                    onCancel = { goToMenu() }
                 )
             }
         }
