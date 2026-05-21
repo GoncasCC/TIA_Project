@@ -6,14 +6,23 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
 import com.example.tia_project.screens.*
 
 class MainActivity : ComponentActivity() {
@@ -31,8 +40,10 @@ class MainActivity : ComponentActivity() {
             }
 
             var currentScreen by remember {
-                mutableStateOf(if (hasSeenGuide) "menu" else "guide")
+                mutableStateOf("launcher")
             }
+
+            val normalStartScreen = if (hasSeenGuide) "menu" else "guide"
 
             var showReopenGuideMessage by remember {
                 mutableStateOf(!hasSeenGuide)
@@ -64,6 +75,13 @@ class MainActivity : ComponentActivity() {
             }
 
             when (currentScreen) {
+
+                "launcher" -> LauncherScreen(
+                    onNormalApp = { currentScreen = normalStartScreen },
+                    onTestScreen = { currentScreen = "startingScreen" }
+                )
+
+                "startingScreen" -> StartingScreen()
 
                 "menu" -> key(menuInstance) {
                     MenuScreen(
@@ -186,6 +204,45 @@ class MainActivity : ComponentActivity() {
                     onCancel = { goToMenu() }
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun LauncherScreen(
+    onNormalApp: () -> Unit,
+    onTestScreen: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "TIA Project",
+            style = MaterialTheme.typography.headlineLarge
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Escolhe onde ir:",
+            style = MaterialTheme.typography.bodyLarge
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onNormalApp,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Text("Aplicação (Tutorial / Menu)")
+        }
+
+        OutlinedButton(onClick = onTestScreen) {
+            Text("Starting Screen (Teste)")
         }
     }
 }
