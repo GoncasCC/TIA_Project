@@ -39,7 +39,7 @@ fun ProgressScreen(
     val textColor = if (darkModeEnabled) Color.White else Color.Black
     val greenColor = Color(0xFF00C853)
 
-    val periods = listOf("TODAY", "YESTERDAY", "THIS WEEK", "THIS MONTH", "ALL TIME")
+    val periods = listOf("PERSONAL BEST", "TODAY", "YESTERDAY", "THIS WEEK", "THIS MONTH", "ALL TIME")
 
     var selectedIndex by remember { mutableStateOf(0) }
     val selectedPeriod = periods[selectedIndex]
@@ -47,6 +47,10 @@ fun ProgressScreen(
     val sessions = remember { loadSavedSessions(context) }
     val progressData = remember(selectedPeriod, sessions) {
         calculateProgressForPeriod(selectedPeriod, sessions)
+    }
+
+    val personalBest = remember(sessions) {
+        sessions.maxByOrNull { it.distanceKm }
     }
 
     val vibrator = remember(context) {
@@ -99,10 +103,16 @@ fun ProgressScreen(
 
     LaunchedEffect(selectedPeriod, isTtsReady, voiceoverEnabled) {
         if (!isGoingBack) {
-            speak(
-                progressData.toSpeechText(selectedPeriod),
-                "progress_${selectedPeriod.lowercase().replace(" ", "_")}"
-            )
+            val speechText = if (selectedPeriod == "PERSONAL BEST") {
+                if (personalBest != null) {
+                    "Personal best: ${String.format(Locale.US, "%.2f", personalBest.distanceKm)} kilometers in ${personalBest.timeSeconds.toReadableDurationForSpeech()}."
+                } else {
+                    "Personal best. No personal best yet."
+                }
+            } else {
+                progressData.toSpeechText(selectedPeriod)
+            }
+            speak(speechText, "progress_${selectedPeriod.lowercase().replace(" ", "_")}")
         }
     }
 
@@ -185,44 +195,84 @@ fun ProgressScreen(
                     .offset(y = 80.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = selectedPeriod,
-                    color = greenColor,
-                    fontSize = 52.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
+                if (selectedPeriod == "PERSONAL BEST") {
+                    Text(
+                        text = "PERSONAL BEST",
+                        color = greenColor,
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
 
-                Spacer(modifier = Modifier.height(70.dp))
+                    Spacer(modifier = Modifier.height(70.dp))
 
-                Text(
-                    text = String.format(Locale.US, "%.2f KM", progressData.totalDistanceKm),
-                    color = textColor,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                    if (personalBest != null) {
+                        Text(
+                            text = String.format(Locale.US, "%.2f KM", personalBest.distanceKm),
+                            color = textColor,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = progressData.totalTimeSeconds.toReadableDuration(),
-                    color = textColor,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                        Text(
+                            text = personalBest.timeSeconds.toReadableDuration(),
+                            color = textColor,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            text = "NO PERSONAL\nBEST YET",
+                            color = textColor,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Text(
+                        text = selectedPeriod,
+                        color = greenColor,
+                        fontSize = 52.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(70.dp))
 
-                Text(
-                    text = "SESSIONS: ${progressData.totalSessions}",
-                    color = textColor,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                    Text(
+                        text = String.format(Locale.US, "%.2f KM", progressData.totalDistanceKm),
+                        color = textColor,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = progressData.totalTimeSeconds.toReadableDuration(),
+                        color = textColor,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = "SESSIONS: ${progressData.totalSessions}",
+                        color = textColor,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -297,7 +347,7 @@ private fun ProgressData.toSpeechText(period: String): String {
         else -> period.lowercase()
     }
 
-    return "$periodText, you completed ${String.format(Locale.US, "%.2f", totalDistanceKm)} kilometers in ${totalTimeSeconds.toReadableDurationForSpeech()}. Total sessions: $totalSessions. Swipe with one finger for more progress details. Swipe with two fingers to go back to menu."
+    return "$periodText, you completed ${String.format(Locale.US, "%.2f", totalDistanceKm)} kilometers in ${totalTimeSeconds.toReadableDurationForSpeech()}. Total sessions: $totalSessions."
 }
 
 private fun Int.toReadableDuration(): String {

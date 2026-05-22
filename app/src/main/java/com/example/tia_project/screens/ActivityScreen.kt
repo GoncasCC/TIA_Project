@@ -413,11 +413,11 @@ fun DifficultyScreen(
     onBack: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val options = listOf("EASY", "MEDIUM", "HARD")
+    val options = listOf("JUST VIBING", "STARTING TO SWEAT", "PUSHING LIMITS")
     val colorForOption = mapOf(
-        "EASY" to Color(0xFF00C853),
-        "MEDIUM" to Color(0xFFFFCC00),
-        "HARD" to Color(0xFFD50000)
+        "JUST VIBING" to Color(0xFF00C853),
+        "STARTING TO SWEAT" to Color(0xFFFFCC00),
+        "PUSHING LIMITS" to Color(0xFFD50000)
     )
 
     var selectedIndex by remember { mutableStateOf(0) }
@@ -590,7 +590,11 @@ fun DifficultyScreen(
             Text(
                 text = selectedOption,
                 color = colorForOption[selectedOption] ?: Color.White,
-                fontSize = 96.sp,
+                fontSize = when {
+                    selectedOption.length > 15 -> 54.sp
+                    selectedOption.length > 10 -> 64.sp
+                    else -> 80.sp
+                },
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
