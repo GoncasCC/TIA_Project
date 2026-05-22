@@ -28,6 +28,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
 
 @Composable
 fun TrainingSession(
@@ -53,8 +55,6 @@ fun TrainingSession(
     var elapsedSeconds by remember { mutableStateOf(0) }
     var distanceMeters by remember { mutableStateOf(0f) }
     var isPaused by remember { mutableStateOf(false) }
-    var askingToEnd by remember { mutableStateOf(false) }
-    var endOptionIsYes by remember { mutableStateOf(false) }
     var halfwayAnnounced by remember { mutableStateOf(false) }
     var levelEndAnnounced by remember { mutableStateOf(false) }
     var stopWarningSent by remember { mutableStateOf(false) }
@@ -62,22 +62,29 @@ fun TrainingSession(
 
     val vibrator = remember(context) { context.getVibratorCompat() }
 
-    fun vibrateNormal() {
+    val isJustVibing = difficulty == "JUST VIBING"
+    val isStartingToSweat = difficulty == "STARTING TO SWEAT"
+    val isPushingLimits = difficulty == "PUSHING LIMITS"
+
+    val currentSpeedKmh = if (elapsedSeconds > 0) {
+        (distanceMeters / 1000f) / (elapsedSeconds / 3600f)
+    } else {
+        0f
+    }
+
+    var lastMotivationSecond by remember { mutableStateOf(0) }
+
+    val personalBest = remember { getPersonalBestSession(context) }
+    var personalBestAnnounced by remember { mutableStateOf(false) }
+
+    fun vibratePhoneAfterSession() {
         if (!vibrationEnabled) return
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(180, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
-            @Suppress("DEPRECATION") vibrator.vibrate(180)
-        }
-    }
-
-    fun vibrateStopWarning() {
-        if (!vibrationEnabled) return
-        val pattern = longArrayOf(0, 120, 80, 120, 80, 350)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
-        } else {
-            @Suppress("DEPRECATION") vibrator.vibrate(pattern, -1)
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(180)
         }
     }
 
@@ -87,6 +94,40 @@ fun TrainingSession(
     fun speak(text: String, id: String) {
         if (isTtsReady && voiceoverEnabled) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        }
+    }
+
+    LaunchedEffect(elapsedSeconds, difficulty) {
+        if (!isPushingLimits) return@LaunchedEffect
+
+        if (elapsedSeconds > 0 && elapsedSeconds - lastMotivationSecond >= 60) {
+            lastMotivationSecond = elapsedSeconds
+
+            if (currentSpeedKmh > 0f) {
+                speak(
+                    "Keep pushing. Your current speed is ${
+                        String.format(Locale.US, "%.1f", currentSpeedKmh)
+                    } kilometers per hour.",
+                    "pushing_speed_$elapsedSeconds"
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(distanceMeters, difficulty) {
+        if (!isPushingLimits) return@LaunchedEffect
+
+        val bestDistanceMeters = (personalBest?.distanceKm ?: 0f) * 1000f
+
+        if (!personalBestAnnounced && bestDistanceMeters > 0f && distanceMeters > bestDistanceMeters) {
+            personalBestAnnounced = true
+
+            speak(
+                "You have a new personal best. ${
+                    String.format(Locale.US, "%.2f", distanceMeters / 1000f)
+                } kilometers.",
+                "new_personal_best"
+            )
         }
     }
 
@@ -120,8 +161,21 @@ fun TrainingSession(
         ((elapsedSeconds % 60) / 60f).coerceIn(0f, 1f)
     }
 
-    LaunchedEffect(isPaused, askingToEnd, totalProgress) {
-        while (!isPaused && !askingToEnd && totalProgress < 1f) {
+    LaunchedEffect(totalProgress, levelNumber, isPaused, difficulty) {
+        val request = PutDataMapRequest.create("/session_progress").apply {
+            dataMap.putFloat("progress", totalProgress)
+            dataMap.putInt("level", levelNumber)
+            dataMap.putBoolean("paused", isPaused)
+            dataMap.putString("difficulty", difficulty)
+            dataMap.putLong("timestamp", System.currentTimeMillis())
+            dataMap.putBoolean("vibrationEnabled", vibrationEnabled)
+        }.asPutDataRequest().setUrgent()
+
+        Wearable.getDataClient(context).putDataItem(request)
+    }
+
+    LaunchedEffect(isPaused, totalProgress) {
+        while (!isPaused && totalProgress < 1f) {
             delay(1000)
             elapsedSeconds += 1
 
@@ -130,29 +184,35 @@ fun TrainingSession(
         }
     }
 
-    LaunchedEffect(isPaused, askingToEnd, distanceMeters) {
-        while (!isPaused && !askingToEnd && totalProgress < 1f) {
+    LaunchedEffect(isPaused, distanceMeters, difficulty) {
+        if (isJustVibing) return@LaunchedEffect
+
+        while (!isPaused && totalProgress < 1f) {
             delay(8000)
+
             val hasMoved = distanceMeters > lastDistanceForStopCheck + 1f
+
             if (!hasMoved && !stopWarningSent) {
                 stopWarningSent = true
-                vibrateStopWarning()
                 speak("You stopped. Keep going.", "stopped_keep_going")
             }
+
             if (hasMoved) stopWarningSent = false
+
             lastDistanceForStopCheck = distanceMeters
         }
     }
 
-    LaunchedEffect(levelProgress, isTtsReady) {
+    LaunchedEffect(levelProgress, isTtsReady, difficulty) {
+        if (isJustVibing) return@LaunchedEffect
+
         if (!halfwayAnnounced && levelProgress >= 0.5f) {
             halfwayAnnounced = true
-            vibrateNormal()
             speak("You are halfway through level $levelNumber.", "halfway_level_$levelNumber")
         }
+
         if (!levelEndAnnounced && levelProgress >= 0.98f) {
             levelEndAnnounced = true
-            vibrateNormal()
             speak("End of level $levelNumber.", "end_level_$levelNumber")
         }
     }
@@ -175,10 +235,47 @@ fun TrainingSession(
         )
     }
 
+    var lastWatchCommandTimestamp by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500)
+
+            val prefs = context.getSharedPreferences("watch_commands", Context.MODE_PRIVATE)
+            val command = prefs.getString("command", null)
+            val timestamp = prefs.getLong("timestamp", 0L)
+
+            if (timestamp > lastWatchCommandTimestamp) {
+                lastWatchCommandTimestamp = timestamp
+
+                when (command) {
+                    "pause" -> {
+                        isPaused = true
+                        speak("Workout paused.", "watch_pause")
+                        // TODO: pause music
+                    }
+
+                    "resume" -> {
+                        isPaused = false
+                        speak("Workout resumed.", "watch_resume")
+                        // TODO: resume music
+                    }
+
+                    "end_session" -> {
+                        finishSession(endedEarly = true)
+                        speak("Workout ended.", "watch_end")
+                        delay(1200)
+                        onCancel()
+                    }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(totalProgress) {
         if (totalProgress >= 1f) {
             finishSession(endedEarly = false)
-            vibrateNormal()
+            vibratePhoneAfterSession()
             speak("Workout complete.", "workout_complete")
             delay(1200)
             onFinish()
@@ -188,141 +285,8 @@ fun TrainingSession(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
-            .pointerInput(isPaused, askingToEnd, endOptionIsYes) {
-                coroutineScope {
-                    launch {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                vibrateNormal()
-                                if (askingToEnd) {
-                                    if (endOptionIsYes) {
-                                        finishSession(endedEarly = true)
-                                        speak("Workout ended early.", "ended_early")
-                                        onCancel()
-                                    } else {
-                                        askingToEnd = false
-                                        isPaused = false
-                                        speak("Workout resumed.", "resumed_from_end_question")
-                                    }
-                                } else {
-                                    isPaused = !isPaused
-                                    speak(if (isPaused) "Workout paused." else "Workout resumed.", "pause_toggle")
-                                }
-                            },
-                            onLongPress = {
-                                vibrateNormal()
-                                askingToEnd = true
-                                isPaused = true
-                                endOptionIsYes = false
-                                speak(
-                                    "Do you want to end the workout early? No selected. Swipe right for yes. Double tap to confirm.",
-                                    "ask_end_early"
-                                )
-                            }
-                        )
-                    }
-                    launch {
-                        detectHorizontalDragGestures { change, dragAmount ->
-                            change.consume()
-                            if (askingToEnd && dragAmount > 25f) {
-                                endOptionIsYes = true
-                                vibrateNormal()
-                                speak("Yes selected.", "yes_selected")
-                            } else if (askingToEnd && dragAmount < -25f) {
-                                endOptionIsYes = false
-                                vibrateNormal()
-                                speak("No selected.", "no_selected")
-                            }
-                        }
-                    }
-                }
-            },
-        contentAlignment = Alignment.Center
+            .background(Color.Black)
     ) {
-        if (askingToEnd) {
-            EndSessionQuestion(textColor, progressColor, endOptionIsYes)
-        } else {
-            TrainingProgressContent(
-                isPaused = isPaused,
-                levelNumber = levelNumber,
-                totalProgress = totalProgress,
-                isDistanceGoal = isDistanceGoal,
-                distanceMeters = distanceMeters,
-                elapsedSeconds = elapsedSeconds,
-                textColor = textColor,
-                progressColor = progressColor
-            )
-        }
-    }
-}
-
-@Composable
-private fun EndSessionQuestion(textColor: Color, progressColor: Color, endOptionIsYes: Boolean) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("END SESSION?", color = textColor, fontSize = 54.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        Spacer(modifier = Modifier.height(50.dp))
-        Text(
-            text = if (endOptionIsYes) "YES" else "NO",
-            color = if (endOptionIsYes) Color(0xFFD50000) else progressColor,
-            fontSize = 96.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-private fun TrainingProgressContent(
-    isPaused: Boolean,
-    levelNumber: Int,
-    totalProgress: Float,
-    isDistanceGoal: Boolean,
-    distanceMeters: Float,
-    elapsedSeconds: Int,
-    textColor: Color,
-    progressColor: Color
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 36.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = if (isPaused) "PAUSED" else "LEVEL $levelNumber",
-            color = textColor,
-            fontSize = 52.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Box(contentAlignment = Alignment.Center) {
-            Canvas(modifier = Modifier.size(330.dp)) {
-                drawCircle(color = Color(0xFF1B5E20), radius = size.minDimension / 2f, style = Stroke(width = 34f))
-                drawArc(
-                    color = progressColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * totalProgress,
-                    useCenter = false,
-                    style = Stroke(width = 34f, cap = StrokeCap.Round)
-                )
-            }
-            Text("${(totalProgress * 100).toInt()}%", color = textColor, fontSize = 62.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Text(
-            text = if (isDistanceGoal) "${String.format(Locale.US, "%.2f", distanceMeters / 1000f)} KM" else elapsedSeconds.toTimerText(),
-            color = textColor,
-            fontSize = 64.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -364,3 +328,23 @@ private fun Int.toTimerText(): String {
     val seconds = this % 60
     return String.format(Locale.US, "%02d:%02d", minutes, seconds)
 }
+
+private fun getPersonalBestSession(context: Context): SavedSession? {
+    val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
+    val rawSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
+
+    return rawSessions.mapNotNull { raw ->
+        val parts = raw.split("|")
+
+        if (parts.size == 3) {
+            SavedSession(
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0
+            )
+        } else {
+            null
+        }
+    }.maxByOrNull { it.distanceKm }
+}
+

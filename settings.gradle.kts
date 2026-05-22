@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "TIA_Project"
 include(":app")
+include(":wear")

@@ -15,6 +15,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TIA_Project">
 
+        <service
+            android:name=".PhoneWearListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
