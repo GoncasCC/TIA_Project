@@ -84,19 +84,58 @@ fun TrainingSession(
         }
     }
 
-    LaunchedEffect(elapsedSeconds, difficulty) {
+    LaunchedEffect(elapsedSeconds, distanceMeters, difficulty) {
         if (!isPushingLimits) return@LaunchedEffect
+        if (personalBest == null) return@LaunchedEffect
+        if (elapsedSeconds <= 0) return@LaunchedEffect
 
-        if (elapsedSeconds > 0 && elapsedSeconds - lastMotivationSecond >= 60) {
+        if (elapsedSeconds - lastMotivationSecond >= 10) {
             lastMotivationSecond = elapsedSeconds
 
-            if (currentSpeedKmh > 0f) {
-                speak(
-                    "Keep pushing. Your current speed is ${
-                        String.format(Locale.US, "%.1f", currentSpeedKmh)
-                    } kilometers per hour.",
-                    "pushing_speed_$elapsedSeconds"
-                )
+            val bestDistanceMeters = personalBest.distanceKm * 1000f
+            val bestTimeSeconds = personalBest.timeSeconds
+
+            val remainingDistanceMeters = bestDistanceMeters - distanceMeters
+            val remainingTimeSeconds = bestTimeSeconds - elapsedSeconds
+
+            when {
+                distanceMeters >= bestDistanceMeters -> {
+                    speak(
+                        "You are beating your personal best. Keep going.",
+                        "pb_beating_$elapsedSeconds"
+                    )
+                }
+
+                remainingTimeSeconds <= 0 -> {
+                    speak(
+                        "Keep going. Focus on finishing strong.",
+                        "pb_not_possible_$elapsedSeconds"
+                    )
+                }
+
+                currentSpeedKmh <= 0f -> {
+                    speak(
+                        "Start moving to chase your personal best.",
+                        "pb_start_moving_$elapsedSeconds"
+                    )
+                }
+
+                else -> {
+                    val requiredSpeedKmh =
+                        (remainingDistanceMeters / 1000f) / (remainingTimeSeconds / 3600f)
+
+                    if (currentSpeedKmh >= requiredSpeedKmh) {
+                        speak(
+                            "You can still beat your personal best. Keep this pace.",
+                            "pb_keep_pace_$elapsedSeconds"
+                        )
+                    } else {
+                        speak(
+                            "You can still beat your personal best if you speed up a little.",
+                            "pb_speed_up_$elapsedSeconds"
+                        )
+                    }
+                }
             }
         }
     }
@@ -287,7 +326,7 @@ fun TrainingSession(
             if (!hasMoved && !stopWarningSent) {
                 stopWarningSent = true
                 isPaused = true
-                speak("You stopped. Keep going.", "stopped_keep_going")
+                speak("You stopped. Let's keep going.", "stopped_keep_going")
                 sendWatchVibrationEvent(context, "stop_warning")
             }
 

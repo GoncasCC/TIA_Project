@@ -130,6 +130,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
 
         progressState = (sessionSteps.toFloat() / targetSteps).coerceIn(0f, 1f)
         levelState = (sessionSteps / 100) + 1
+
+        sendWatchProgress()
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
