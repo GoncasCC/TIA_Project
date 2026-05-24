@@ -16,8 +16,16 @@ import com.example.wear.presentation.screens.WatchProgressScreen
 import kotlinx.coroutines.delay
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
 
-class MainActivity : ComponentActivity(), SensorEventListener {
+class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnDataChangedListener {
 
     private lateinit var sensorManager: SensorManager
     private var stepCounterSensor: Sensor? = null
@@ -89,6 +97,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onResume() {
         super.onResume()
 
+        Wearable.getDataClient(this).addListener(this)
+
         stepCounterSensor?.also { sensor ->
             sensorManager.registerListener(
                 this,
@@ -100,6 +110,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onPause() {
         super.onPause()
+
+        Wearable.getDataClient(this).removeListener(this)
         sensorManager.unregisterListener(this)
     }
 
@@ -140,6 +152,54 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }.asPutDataRequest().setUrgent()
 
         Wearable.getDataClient(this).putDataItem(request)
+    }
+    override fun onDataChanged(dataEvents: DataEventBuffer) {
+        dataEvents.forEach { event ->
+            if (event.type == DataEvent.TYPE_CHANGED) {
+                val path = event.dataItem.uri.path
+                val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+
+                when (path) {
+                    "/session_progress" -> {
+                        difficultyState = dataMap.getString("difficulty") ?: "JUST VIBING"
+                        pausedState = dataMap.getBoolean("paused")
+                        vibrationEnabledState = dataMap.getBoolean("vibrationEnabled", true)
+                    }
+
+                    "/watch_vibration" -> {
+                        val type = dataMap.getString("type") ?: return@forEach
+                        vibrateForEvent(type)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun vibrateForEvent(type: String) {
+        if (!vibrationEnabledState) return
+
+        val pattern = when (type) {
+            "halfway" -> longArrayOf(0, 120)
+            "level_complete" -> longArrayOf(0, 150, 100, 150)
+            "stop_warning" -> longArrayOf(0, 500)
+            "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
+            else -> longArrayOf(0, 100)
+        }
+
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            manager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+        }
     }
 }
 

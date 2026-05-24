@@ -90,7 +90,7 @@ fun WatchProgressScreen(
             Text(
                 text = when {
                     paused -> "PAUSED"
-                    difficulty == "JUST VIBING" -> "${(progress * 100).toInt()}%"
+                    difficulty == "JUST VIBING" -> "${(progress.coerceIn(0f, 1f) * 100).toInt()}%"
                     else -> "L$level"
                 },
                 color = Color.White,

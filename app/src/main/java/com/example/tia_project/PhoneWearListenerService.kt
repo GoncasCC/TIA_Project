@@ -20,12 +20,17 @@ class PhoneWearListenerService : WearableListenerService() {
                     }
 
                     "/watch_progress" -> {
-                        saveWatchProgress(
-                            progress = dataMap.getFloat("progress"),
-                            level = dataMap.getInt("level"),
-                            paused = dataMap.getBoolean("paused"),
-                            difficulty = dataMap.getString("difficulty") ?: "JUST VIBING"
-                        )
+                        val progress = dataMap.getFloat("progress")
+                        val level = dataMap.getInt("level")
+                        val paused = dataMap.getBoolean("paused")
+
+                        getSharedPreferences("watch_progress", MODE_PRIVATE)
+                            .edit()
+                            .putFloat("progress", progress)
+                            .putInt("level", level)
+                            .putBoolean("paused", paused)
+                            .putLong("timestamp", System.currentTimeMillis())
+                            .apply()
                     }
                 }
             }

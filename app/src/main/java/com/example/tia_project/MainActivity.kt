@@ -39,11 +39,11 @@ class MainActivity : ComponentActivity() {
                 prefs.getBoolean("has_seen_guide", false)
             }
 
-            var currentScreen by remember {
-                mutableStateOf("launcher")
-            }
-
             val normalStartScreen = if (hasSeenGuide) "menu" else "guide"
+
+            var currentScreen by remember {
+                mutableStateOf(normalStartScreen)
+            }
 
             var showReopenGuideMessage by remember {
                 mutableStateOf(!hasSeenGuide)
@@ -75,13 +75,6 @@ class MainActivity : ComponentActivity() {
             }
 
             when (currentScreen) {
-
-                "launcher" -> LauncherScreen(
-                    onNormalApp = { currentScreen = normalStartScreen },
-                    onTestScreen = { currentScreen = "startingScreen" }
-                )
-
-                "startingScreen" -> StartingScreen()
 
                 "menu" -> key(menuInstance) {
                     MenuScreen(
@@ -198,6 +191,7 @@ class MainActivity : ComponentActivity() {
                     goalValue = selectedGoalValue,
                     difficulty = selectedDifficulty,
                     voiceoverEnabled = voiceoverEnabled,
+                    musicEnabled = musicEnabled,
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
                     onFinish = { goToMenu() },
@@ -208,44 +202,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun LauncherScreen(
-    onNormalApp: () -> Unit,
-    onTestScreen: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "TIA Project",
-            style = MaterialTheme.typography.headlineLarge
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Escolhe onde ir:",
-            style = MaterialTheme.typography.bodyLarge
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = onNormalApp,
-            modifier = Modifier.padding(bottom = 16.dp)
-        ) {
-            Text("Aplicação (Tutorial / Menu)")
-        }
-
-        OutlinedButton(onClick = onTestScreen) {
-            Text("Starting Screen (Teste)")
-        }
-    }
-}
 
 @Composable
 fun SimpleTextScreen(

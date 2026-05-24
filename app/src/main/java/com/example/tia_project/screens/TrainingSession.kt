@@ -1,10 +1,6 @@
 package com.example.tia_project.screens
 
 import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,6 +26,8 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import android.media.MediaPlayer
+import com.example.tia_project.R
 
 @Composable
 fun TrainingSession(
@@ -40,6 +38,7 @@ fun TrainingSession(
     voiceoverEnabled: Boolean,
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
+    musicEnabled: Boolean,
     onFinish: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -60,7 +59,6 @@ fun TrainingSession(
     var stopWarningSent by remember { mutableStateOf(false) }
     var lastDistanceForStopCheck by remember { mutableStateOf(0f) }
 
-    val vibrator = remember(context) { context.getVibratorCompat() }
 
     val isJustVibing = difficulty == "JUST VIBING"
     val isStartingToSweat = difficulty == "STARTING TO SWEAT"
@@ -76,17 +74,6 @@ fun TrainingSession(
 
     val personalBest = remember { getPersonalBestSession(context) }
     var personalBestAnnounced by remember { mutableStateOf(false) }
-
-    fun vibratePhoneAfterSession() {
-        if (!vibrationEnabled) return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(180, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(180)
-        }
-    }
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
@@ -143,6 +130,28 @@ fun TrainingSession(
         }
     }
 
+    var lastWatchProgressTimestamp by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500)
+
+            val prefs = context.getSharedPreferences("watch_progress", Context.MODE_PRIVATE)
+            val progressFromWatch = prefs.getFloat("progress", 0f)
+            val pausedFromWatch = prefs.getBoolean("paused", false)
+            val timestamp = prefs.getLong("timestamp", 0L)
+
+            if (timestamp > lastWatchProgressTimestamp) {
+                lastWatchProgressTimestamp = timestamp
+                isPaused = pausedFromWatch
+
+                if (isDistanceGoal) {
+                    distanceMeters = progressFromWatch * targetDistanceMeters
+                }
+            }
+        }
+    }
+
     val totalProgress = if (isDistanceGoal) {
         (distanceMeters / targetDistanceMeters).coerceIn(0f, 1f)
     } else {
@@ -155,12 +164,95 @@ fun TrainingSession(
         (elapsedSeconds / 60) + 1
     }
 
-    val levelProgress = if (isDistanceGoal) {
-        ((distanceMeters % 1000f) / 1000f).coerceIn(0f, 1f)
-    } else {
-        ((elapsedSeconds % 60) / 60f).coerceIn(0f, 1f)
+    val musicLevel = when {
+        goalType == "DISTANCE" && goalValue == "1 KILOMETER" ->
+            ((distanceMeters / 100f).toInt() + 1).coerceIn(1, 10)
+
+        goalType == "DISTANCE" && goalValue == "5 KILOMETERS" ->
+            ((distanceMeters / 1000f).toInt() + 1).coerceIn(1, 5)
+
+        goalType == "TIME" && goalValue == "1 MINUTE" ->
+            1
+
+        goalType == "TIME" && goalValue == "5 MINUTES" ->
+            ((elapsedSeconds / 60) + 1).coerceIn(1, 5)
+
+        else -> 1
     }
 
+    val audioResId = when {
+        !musicEnabled -> R.raw.footsteps
+
+        isJustVibing -> R.raw.relaxing_music
+
+        isStartingToSweat -> when (musicLevel) {
+            1 -> R.raw.mode2song1
+            2 -> R.raw.mode2song2
+            3 -> R.raw.mode2song3
+            4 -> R.raw.mode2song4
+            5 -> R.raw.mode2song5
+            else -> R.raw.mode2song1
+        }
+
+        isPushingLimits -> when (musicLevel) {
+            1 -> R.raw.mode3song1
+            2 -> R.raw.mode3song2
+            3 -> R.raw.mode3song3
+            4 -> R.raw.mode3song4
+            5 -> R.raw.mode3song5
+            else -> R.raw.mode3song1
+        }
+
+        else -> R.raw.footsteps
+    }
+
+    val levelProgress = when {
+        goalType == "DISTANCE" && goalValue == "1 KILOMETER" ->
+            ((distanceMeters % 100f) / 100f).coerceIn(0f, 1f)
+
+        goalType == "DISTANCE" && goalValue == "5 KILOMETERS" ->
+            ((distanceMeters % 1000f) / 1000f).coerceIn(0f, 1f)
+
+        goalType == "TIME" && goalValue == "1 MINUTE" ->
+            ((elapsedSeconds % 60) / 60f).coerceIn(0f, 1f)
+
+        goalType == "TIME" && goalValue == "5 MINUTES" ->
+            ((elapsedSeconds % 60) / 60f).coerceIn(0f, 1f)
+
+        else -> 0f
+    }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    LaunchedEffect(audioResId) {
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+
+        mediaPlayer = MediaPlayer.create(context, audioResId).apply {
+            isLooping = true
+
+            if (!isPaused) {
+                start()
+            }
+        }
+    }
+
+    LaunchedEffect(isPaused) {
+        mediaPlayer?.let { player ->
+            if (isPaused && player.isPlaying) {
+                player.pause()
+            } else if (!isPaused && !player.isPlaying) {
+                player.start()
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+        }
+    }
     LaunchedEffect(totalProgress, levelNumber, isPaused, difficulty) {
         val request = PutDataMapRequest.create("/session_progress").apply {
             dataMap.putFloat("progress", totalProgress)
@@ -194,10 +286,15 @@ fun TrainingSession(
 
             if (!hasMoved && !stopWarningSent) {
                 stopWarningSent = true
+                isPaused = true
                 speak("You stopped. Keep going.", "stopped_keep_going")
+                sendWatchVibrationEvent(context, "stop_warning")
             }
 
-            if (hasMoved) stopWarningSent = false
+            if (hasMoved) {
+                stopWarningSent = false
+                isPaused = false
+            }
 
             lastDistanceForStopCheck = distanceMeters
         }
@@ -208,11 +305,13 @@ fun TrainingSession(
 
         if (!halfwayAnnounced && levelProgress >= 0.5f) {
             halfwayAnnounced = true
+            sendWatchVibrationEvent(context, "halfway")
             speak("You are halfway through level $levelNumber.", "halfway_level_$levelNumber")
         }
 
         if (!levelEndAnnounced && levelProgress >= 0.98f) {
             levelEndAnnounced = true
+            sendWatchVibrationEvent(context, "level_complete")
             speak("End of level $levelNumber.", "end_level_$levelNumber")
         }
     }
@@ -262,6 +361,10 @@ fun TrainingSession(
                     }
 
                     "end_session" -> {
+                        mediaPlayer?.stop()
+                        mediaPlayer?.release()
+                        mediaPlayer = null
+
                         finishSession(endedEarly = true)
                         speak("Workout ended.", "watch_end")
                         delay(1200)
@@ -274,8 +377,12 @@ fun TrainingSession(
 
     LaunchedEffect(totalProgress) {
         if (totalProgress >= 1f) {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+
             finishSession(endedEarly = false)
-            vibratePhoneAfterSession()
+            sendWatchVibrationEvent(context, "session_complete")
             speak("Workout complete.", "workout_complete")
             delay(1200)
             onFinish()
@@ -285,7 +392,7 @@ fun TrainingSession(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(backgroundColor)
     ) {
     }
 }
@@ -309,16 +416,6 @@ private fun saveTrainingSession(
     prefs.edit()
         .putStringSet("sessions", oldSessions + newSession)
         .apply()
-}
-
-private fun Context.getVibratorCompat(): Vibrator {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        val manager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-        manager.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-    }
 }
 
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
@@ -348,3 +445,11 @@ private fun getPersonalBestSession(context: Context): SavedSession? {
     }.maxByOrNull { it.distanceKm }
 }
 
+private fun sendWatchVibrationEvent(context: Context, vibrationType: String) {
+    val request = PutDataMapRequest.create("/watch_vibration").apply {
+        dataMap.putString("type", vibrationType)
+        dataMap.putLong("timestamp", System.currentTimeMillis())
+    }.asPutDataRequest().setUrgent()
+
+    Wearable.getDataClient(context).putDataItem(request)
+}

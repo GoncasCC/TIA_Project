@@ -193,6 +193,7 @@ private fun OptionSelectionScreen(
     }
 
     LaunchedEffect(screenKey, selectedOption, isTtsReady, voiceoverEnabled) {
+        delay(600)
         speak(
             speechForOption(selectedOption),
             "option_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
@@ -478,6 +479,7 @@ fun DifficultyScreen(
     }
 
     LaunchedEffect(selectedOption, isTtsReady, voiceoverEnabled) {
+        delay(600)
         speak(
             "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
             "difficulty_$selectedOption"
@@ -620,6 +622,12 @@ fun SummaryScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val safetyColor = Color(0xFFFFCC00)
+    val difficultyColor = when (difficulty) {
+        "JUST VIBING" -> Color(0xFF00C853)
+        "STARTING TO SWEAT" -> Color(0xFFFFCC00)
+        "PUSHING LIMITS" -> Color(0xFFD50000)
+        else -> if (darkModeEnabled) Color.White else Color.Black
+    }
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
@@ -672,6 +680,7 @@ fun SummaryScreen(
     }
 
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
+        delay(600)
         if (isTtsReady && voiceoverEnabled) {
             tts?.speak(
                 "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
@@ -683,14 +692,12 @@ fun SummaryScreen(
                 delay(100)
             }
             delay(300)
-            showTriangle = true
             tts?.speak(
                 "Double tap to confirm you are in a safe, obstacle-free environment.",
-                TextToSpeech.QUEUE_ADD,
+                TextToSpeech.QUEUE_FLUSH,
                 null,
                 "summary2"
             )
-        } else {
             showTriangle = true
         }
     }
@@ -724,38 +731,75 @@ fun SummaryScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (!confirmed && showTriangle) {
-            androidx.compose.foundation.Canvas(modifier = Modifier.size(380.dp)) {
-                val path = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(size.width / 2f, size.height * 0.05f)
-                    lineTo(size.width * 0.97f, size.height * 0.95f)
-                    lineTo(size.width * 0.03f, size.height * 0.95f)
-                    close()
-                }
-                drawPath(path, color = safetyColor)
-                drawPath(
-                    path,
-                    color = Color.Black,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 30f)
-                )
-                drawRect(
-                    color = Color.Black,
-                    topLeft = androidx.compose.ui.geometry.Offset(
-                        size.width / 2f - 22f,
-                        size.height * 0.30f
-                    ),
-                    size = androidx.compose.ui.geometry.Size(44f, size.height * 0.38f)
-                )
-                drawCircle(
-                    color = Color.Black,
-                    radius = 26f,
-                    center = androidx.compose.ui.geometry.Offset(
-                        size.width / 2f,
-                        size.height * 0.84f
+        if (!confirmed) {
+            if (!showTriangle) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 32.dp),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = activity,
+                        color = if (darkModeEnabled) Color.White else Color.Black,
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                )
+                    Text(
+                        text = goalValue,
+                        color = if (darkModeEnabled) Color.White else Color.Black,
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = difficulty,
+                        color = difficultyColor,
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-        } else if (confirmed) {
+
+            if (showTriangle) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.size(380.dp)) {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(size.width / 2f, size.height * 0.05f)
+                        lineTo(size.width * 0.97f, size.height * 0.95f)
+                        lineTo(size.width * 0.03f, size.height * 0.95f)
+                        close()
+                    }
+                    drawPath(path, color = safetyColor)
+                    drawPath(
+                        path,
+                        color = if (darkModeEnabled) Color.Black else Color.White,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 30f)
+                    )
+                    drawRect(
+                        color = Color.Black,
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            size.width / 2f - 22f,
+                            size.height * 0.30f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(44f, size.height * 0.38f)
+                    )
+                    drawCircle(
+                        color = Color.Black,
+                        radius = 26f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            size.width / 2f,
+                            size.height * 0.84f
+                        )
+                    )
+                }
+            }
+        } else {
             var visible by remember { mutableStateOf(true) }
 
             LaunchedEffect(Unit) {
