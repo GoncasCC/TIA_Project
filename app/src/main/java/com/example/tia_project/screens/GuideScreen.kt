@@ -30,6 +30,9 @@ private enum class GuideStep {
     DOUBLE_TAP,
     TWO_FINGER_BACK,
     LONG_PRESS,
+    EASYMODE,
+    MEDIUMMODE,
+    HARDMODE,
     FINISHED
 }
 
@@ -141,6 +144,21 @@ fun GuideScreen(
                 "guide_long_press"
             )
 
+            GuideStep.EASYMODE -> speak(
+                "Now let's learn about the exercise modes. You can choose one of three modes. Just Vibing is the easiest mode. It is designed for relaxed walking or running, with no progress feedback during the session. You will hear relaxing music, or footsteps if music is disabled. Double tap to continue.",
+                "guide_modes"
+            )
+
+            GuideStep.MEDIUMMODE -> speak(
+                "Starting to Sweat is a medium intensity mode. You receive progress feedback as you exercise, and the music changes as you advance through levels. If music is disabled, you will hear footsteps instead. Double tap to continue.",
+                "guide_modes"
+            )
+
+            GuideStep.HARDMODE -> speak(
+                "Pushing Limits is the most intense mode. The system provides motivational feedback to help you improve your pace and beat your personal best. Music is more energetic, or footsteps can be used instead. Double tap to finish the guide.",
+                "guide_modes"
+            )
+
             GuideStep.FINISHED -> {
                 if (!hasFinished) {
                     hasFinished = true
@@ -227,17 +245,36 @@ fun GuideScreen(
             .pointerInput(step) {
                 detectTapGestures(
                     onDoubleTap = {
-                        if (step == GuideStep.DOUBLE_TAP) {
-                            vibrate(150)
-                            speak("Selected.", "guide_select_done")
-                            step = GuideStep.TWO_FINGER_BACK
+                        when (step) {
+                            GuideStep.DOUBLE_TAP -> {
+                                vibrate(150)
+                                speak("Selected.", "guide_select_done")
+                                step = GuideStep.TWO_FINGER_BACK
+                            }
+
+                            GuideStep.EASYMODE -> {
+                                vibrate(150)
+                                step = GuideStep.MEDIUMMODE
+                            }
+
+                            GuideStep.MEDIUMMODE -> {
+                                vibrate(150)
+                                step = GuideStep.HARDMODE
+                            }
+
+                            GuideStep.HARDMODE -> {
+                                vibrate(150)
+                                step = GuideStep.FINISHED
+                            }
+
+                            else -> Unit
                         }
                     },
                     onLongPress = {
                         if (step == GuideStep.LONG_PRESS) {
                             vibrate(500)
                             speak("Cancelled.", "guide_cancel_done")
-                            step = GuideStep.FINISHED
+                            step = GuideStep.EASYMODE
                         }
                     }
                 )
@@ -266,6 +303,9 @@ private fun GuideTrainingLayout(
         GuideStep.DOUBLE_TAP -> "DOUBLE TAP"
         GuideStep.TWO_FINGER_BACK -> "TWO FINGER\nSWIPE"
         GuideStep.LONG_PRESS -> "LONG PRESS"
+        GuideStep.EASYMODE -> "JUST VIBING"
+        GuideStep.MEDIUMMODE -> "STARTING\nTO SWEAT"
+        GuideStep.HARDMODE -> "PUSHING\nLIMITS"
         GuideStep.FINISHED -> "DONE"
     }
 
@@ -274,7 +314,23 @@ private fun GuideTrainingLayout(
         GuideStep.DOUBLE_TAP -> "medium vibration"
         GuideStep.TWO_FINGER_BACK -> "double vibration"
         GuideStep.LONG_PRESS -> "long vibration"
+        GuideStep.EASYMODE -> ""
+        GuideStep.MEDIUMMODE -> ""
+        GuideStep.HARDMODE -> ""
         GuideStep.FINISHED -> "guide completed"
+    }
+    val currentCardColor = when (step) {
+        GuideStep.EASYMODE -> Color(0xFF00C853)
+        GuideStep.MEDIUMMODE -> Color(0xFFFFCC00)
+        GuideStep.HARDMODE -> Color(0xFFD50000)
+        else -> cardColor
+    }
+
+    val currentCardTextColor = when (step) {
+        GuideStep.EASYMODE,
+        GuideStep.MEDIUMMODE,
+        GuideStep.HARDMODE -> Color.Black
+        else -> cardTextColor
     }
 
     Box(
@@ -301,12 +357,12 @@ private fun GuideTrainingLayout(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .background(cardColor, RoundedCornerShape(24.dp)),
+                    .background(currentCardColor, RoundedCornerShape(24.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = instruction,
-                    color = cardTextColor,
+                    color = currentCardTextColor,
                     fontSize = if (instruction.length > 12) 42.sp else 58.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
