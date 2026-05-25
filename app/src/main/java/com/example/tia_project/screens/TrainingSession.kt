@@ -1,6 +1,8 @@
 package com.example.tia_project.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,6 +30,8 @@ import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import android.media.MediaPlayer
 import com.example.tia_project.R
+import com.example.tia_project.sensors.ActivityRecognitionManager
+import androidx.core.content.ContextCompat
 
 @Composable
 fun TrainingSession(
@@ -58,7 +62,7 @@ fun TrainingSession(
     var levelEndAnnounced by remember { mutableStateOf(false) }
     var stopWarningSent by remember { mutableStateOf(false) }
     var lastDistanceForStopCheck by remember { mutableStateOf(0f) }
-
+    var detectedActivity by remember { mutableStateOf("A detetar...") }
 
     val isJustVibing = difficulty == "JUST VIBING"
     val isStartingToSweat = difficulty == "STARTING TO SWEAT"
@@ -77,6 +81,7 @@ fun TrainingSession(
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
     var isStoppedByInactivity by remember { mutableStateOf(false) }
     val shouldStopSessionProgress = isPaused || isStoppedByInactivity
@@ -84,6 +89,31 @@ fun TrainingSession(
     fun speak(text: String, id: String) {
         if (isTtsReady && voiceoverEnabled) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        }
+    }
+
+    val activityRecognitionManager = remember {
+        ActivityRecognitionManager(
+            context = context,
+            onActivityChanged = { label -> detectedActivity = label },
+            onError = { message -> detectedActivity = message }
+        )
+    }
+
+    DisposableEffect(Unit) {
+        val hasActivityPermission =
+            android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q ||
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACTIVITY_RECOGNITION
+                    ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasActivityPermission) {
+            activityRecognitionManager.startListening()
+        }
+
+        onDispose {
+            activityRecognitionManager.stopListening()
         }
     }
 
@@ -189,6 +219,10 @@ fun TrainingSession(
 
                 if (isDistanceGoal) {
                     distanceMeters = progressFromWatch * targetDistanceMeters
+                } else {
+                    elapsedSeconds = (progressFromWatch * targetTimeSeconds)
+                        .toInt()
+                        .coerceIn(0, targetTimeSeconds)
                 }
             }
         }
@@ -263,7 +297,6 @@ fun TrainingSession(
 
         else -> 0f
     }
-    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
     LaunchedEffect(audioResId) {
         mediaPlayer?.stop()
@@ -301,6 +334,8 @@ fun TrainingSession(
             dataMap.putInt("level", levelNumber)
             dataMap.putBoolean("paused", isPaused)
             dataMap.putString("difficulty", difficulty)
+            dataMap.putString("goalType", goalType)
+            dataMap.putInt("targetSteps", estimateTargetSteps(targetDistanceMeters))
             dataMap.putLong("timestamp", System.currentTimeMillis())
             dataMap.putBoolean("vibrationEnabled", vibrationEnabled)
         }.asPutDataRequest().setUrgent()
@@ -308,10 +343,13 @@ fun TrainingSession(
         Wearable.getDataClient(context).putDataItem(request)
     }
 
-    LaunchedEffect(shouldStopSessionProgress, totalProgress) {
+    LaunchedEffect(shouldStopSessionProgress, totalProgress, isDistanceGoal) {
         while (!shouldStopSessionProgress && totalProgress < 1f) {
             delay(1000)
-            elapsedSeconds += 1
+
+            if (isDistanceGoal) {
+                elapsedSeconds += 1
+            }
         }
     }
 
@@ -322,8 +360,9 @@ fun TrainingSession(
             delay(8000)
 
             val hasMoved = distanceMeters > lastDistanceForStopCheck + 1f
+            val isStill = detectedActivity == "Parado"
 
-            if (!hasMoved && !stopWarningSent) {
+            if ((!hasMoved || isStill) && !stopWarningSent) {
                 stopWarningSent = true
                 isStoppedByInactivity = true
                 speak("You stopped. Let's keep going.", "stopped_keep_going")
@@ -363,7 +402,7 @@ fun TrainingSession(
     fun finishSession(endedEarly: Boolean) {
         saveTrainingSession(
             context = context,
-            activity = activity,
+            activity = if (detectedActivity.isNotBlank() && detectedActivity != "A detetar...") detectedActivity else activity,
             goalType = goalType,
             goalValue = goalValue,
             difficulty = difficulty,
@@ -390,13 +429,13 @@ fun TrainingSession(
                     "pause" -> {
                         isPaused = true
                         speak("Workout paused.", "watch_pause")
-                        // TODO: pause music
+                        mediaPlayer?.takeIf { it.isPlaying }?.pause()
                     }
 
                     "resume" -> {
                         isPaused = false
                         speak("Workout resumed.", "watch_resume")
-                        // TODO: resume music
+                        mediaPlayer?.takeIf { !it.isPlaying }?.start()
                     }
 
                     "end_session" -> {
@@ -458,6 +497,11 @@ private fun saveTrainingSession(
 }
 
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
+
+private fun estimateTargetSteps(targetDistanceMeters: Float): Int {
+    val averageStrideMeters = 0.78f
+    return (targetDistanceMeters / averageStrideMeters).toInt().coerceAtLeast(1)
+}
 
 private fun Int.toTimerText(): String {
     val minutes = this / 60

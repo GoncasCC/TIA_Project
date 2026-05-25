@@ -23,14 +23,9 @@ class PhoneWearListenerService : WearableListenerService() {
                         val progress = dataMap.getFloat("progress")
                         val level = dataMap.getInt("level")
                         val paused = dataMap.getBoolean("paused")
+                        val difficulty = dataMap.getString("difficulty") ?: ""
 
-                        getSharedPreferences("watch_progress", MODE_PRIVATE)
-                            .edit()
-                            .putFloat("progress", progress)
-                            .putInt("level", level)
-                            .putBoolean("paused", paused)
-                            .putLong("timestamp", System.currentTimeMillis())
-                            .apply()
+                        saveWatchProgress(progress, level, paused, difficulty)
                     }
                 }
             }

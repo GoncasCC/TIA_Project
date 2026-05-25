@@ -6,24 +6,23 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.wear.presentation.screens.WatchProgressScreen
-import kotlinx.coroutines.delay
-import com.google.android.gms.wearable.PutDataMapRequest
-import com.google.android.gms.wearable.Wearable
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
 
 class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnDataChangedListener {
 
@@ -37,7 +36,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
     private var pausedState by mutableStateOf(false)
     private var difficultyState by mutableStateOf("JUST VIBING")
 
-    private val targetSteps = 100
+    private var goalTypeState by mutableStateOf("DISTANCE")
+    private var targetSteps by mutableStateOf(1)
 
     private var vibrationEnabledState by mutableStateOf(true)
 
@@ -60,21 +60,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
         }
 
         setContent {
-            /////////simulate steps (delete for a real interaction)
-            LaunchedEffect(Unit) {
-
-                while (true) {
-                    delay(1000)
-
-                    if (!pausedState && progressState < 1f) {
-                        progressState += 0.02f
-                        levelState =
-                            ((progressState * 5).toInt() + 1).coerceAtMost(5)
-
-                        sendWatchProgress()
-                    }
-                }
-            }
             WatchProgressScreen(
                 progress = progressState,
                 level = levelState,
@@ -117,6 +102,26 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (pausedState) return
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (pausedState) return
+            if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
+
+            val totalStepsFromDevice = event.values[0]
+
+            if (initialSteps == null) {
+                initialSteps = totalStepsFromDevice
+            }
+
+            val sessionSteps =
+                (totalStepsFromDevice - (initialSteps ?: totalStepsFromDevice)).toInt()
+
+            if (goalTypeState == "DISTANCE") {
+                progressState = (sessionSteps.toFloat() / targetSteps).coerceIn(0f, 1f)
+                levelState = ((progressState * 5).toInt() + 1).coerceIn(1, 5)
+            }
+
+            sendWatchProgress()
+        }
         if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
 
         val totalStepsFromDevice = event.values[0]
@@ -129,7 +134,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
             (totalStepsFromDevice - (initialSteps ?: totalStepsFromDevice)).toInt()
 
         progressState = (sessionSteps.toFloat() / targetSteps).coerceIn(0f, 1f)
-        levelState = (sessionSteps / 100) + 1
+        levelState = ((progressState * 5).toInt() + 1).coerceIn(1, 5)
 
         sendWatchProgress()
     }
@@ -144,6 +149,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
 
         Wearable.getDataClient(this).putDataItem(request)
     }
+
     private fun sendWatchProgress() {
         val request = PutDataMapRequest.create("/watch_progress").apply {
             dataMap.putFloat("progress", progressState)
@@ -155,6 +161,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
 
         Wearable.getDataClient(this).putDataItem(request)
     }
+
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         dataEvents.forEach { event ->
             if (event.type == DataEvent.TYPE_CHANGED) {
@@ -166,6 +173,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
                         difficultyState = dataMap.getString("difficulty") ?: "JUST VIBING"
                         pausedState = dataMap.getBoolean("paused")
                         vibrationEnabledState = dataMap.getBoolean("vibrationEnabled", true)
+
+                        goalTypeState = dataMap.getString("goalType") ?: "DISTANCE"
+                        targetSteps = dataMap.getInt("targetSteps", 1).coerceAtLeast(1)
+
+                        if (goalTypeState == "TIME") {
+                            progressState = dataMap.getFloat("progress", progressState)
+                            levelState = dataMap.getInt("level", levelState)
+                        }
                     }
 
                     "/watch_vibration" -> {
@@ -204,4 +219,3 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
         }
     }
 }
-
