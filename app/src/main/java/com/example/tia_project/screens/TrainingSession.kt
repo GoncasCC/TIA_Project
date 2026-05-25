@@ -78,6 +78,9 @@ fun TrainingSession(
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
 
+    var isStoppedByInactivity by remember { mutableStateOf(false) }
+    val shouldStopSessionProgress = isPaused || isStoppedByInactivity
+
     fun speak(text: String, id: String) {
         if (isTtsReady && voiceoverEnabled) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
@@ -269,17 +272,17 @@ fun TrainingSession(
         mediaPlayer = MediaPlayer.create(context, audioResId).apply {
             isLooping = true
 
-            if (!isPaused) {
+            if (!shouldStopSessionProgress) {
                 start()
             }
         }
     }
 
-    LaunchedEffect(isPaused) {
+    LaunchedEffect(shouldStopSessionProgress) {
         mediaPlayer?.let { player ->
-            if (isPaused && player.isPlaying) {
+            if (shouldStopSessionProgress && player.isPlaying) {
                 player.pause()
-            } else if (!isPaused && !player.isPlaying) {
+            } else if (!shouldStopSessionProgress && !player.isPlaying) {
                 player.start()
             }
         }
@@ -305,13 +308,10 @@ fun TrainingSession(
         Wearable.getDataClient(context).putDataItem(request)
     }
 
-    LaunchedEffect(isPaused, totalProgress) {
-        while (!isPaused && totalProgress < 1f) {
+    LaunchedEffect(shouldStopSessionProgress, totalProgress) {
+        while (!shouldStopSessionProgress && totalProgress < 1f) {
             delay(1000)
             elapsedSeconds += 1
-
-            // IMPORTANT: distanceMeters does not increase here anymore.
-            // Later, connect this value to GPS, step counter, or smartwatch data.
         }
     }
 
@@ -325,14 +325,14 @@ fun TrainingSession(
 
             if (!hasMoved && !stopWarningSent) {
                 stopWarningSent = true
-                isPaused = true
+                isStoppedByInactivity = true
                 speak("You stopped. Let's keep going.", "stopped_keep_going")
                 sendWatchVibrationEvent(context, "stop_warning")
             }
 
             if (hasMoved) {
                 stopWarningSent = false
-                isPaused = false
+                isStoppedByInactivity = false
             }
 
             lastDistanceForStopCheck = distanceMeters
