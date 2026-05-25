@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
 
     private var goalTypeState by mutableStateOf("DISTANCE")
     private var targetSteps by mutableStateOf(1)
+    private var sessionStepsState by mutableStateOf(0)
 
     private var vibrationEnabledState by mutableStateOf(true)
 
@@ -102,26 +103,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (pausedState) return
-        override fun onSensorChanged(event: SensorEvent?) {
-            if (pausedState) return
-            if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
-
-            val totalStepsFromDevice = event.values[0]
-
-            if (initialSteps == null) {
-                initialSteps = totalStepsFromDevice
-            }
-
-            val sessionSteps =
-                (totalStepsFromDevice - (initialSteps ?: totalStepsFromDevice)).toInt()
-
-            if (goalTypeState == "DISTANCE") {
-                progressState = (sessionSteps.toFloat() / targetSteps).coerceIn(0f, 1f)
-                levelState = ((progressState * 5).toInt() + 1).coerceIn(1, 5)
-            }
-
-            sendWatchProgress()
-        }
         if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
 
         val totalStepsFromDevice = event.values[0]
@@ -133,8 +114,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
         val sessionSteps =
             (totalStepsFromDevice - (initialSteps ?: totalStepsFromDevice)).toInt()
 
-        progressState = (sessionSteps.toFloat() / targetSteps).coerceIn(0f, 1f)
-        levelState = ((progressState * 5).toInt() + 1).coerceIn(1, 5)
+        sessionStepsState = sessionSteps
+
+        if (goalTypeState == "DISTANCE") {
+            progressState = (sessionSteps.toFloat() / targetSteps).coerceIn(0f, 1f)
+            levelState = ((progressState * 5).toInt() + 1).coerceIn(1, 5)
+        }
 
         sendWatchProgress()
     }
@@ -156,6 +141,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, DataClient.OnData
             dataMap.putInt("level", levelState)
             dataMap.putBoolean("paused", pausedState)
             dataMap.putString("difficulty", difficultyState)
+            dataMap.putInt("steps", sessionStepsState)
             dataMap.putLong("timestamp", System.currentTimeMillis())
         }.asPutDataRequest().setUrgent()
 

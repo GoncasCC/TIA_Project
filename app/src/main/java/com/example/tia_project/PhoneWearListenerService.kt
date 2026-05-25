@@ -24,8 +24,9 @@ class PhoneWearListenerService : WearableListenerService() {
                         val level = dataMap.getInt("level")
                         val paused = dataMap.getBoolean("paused")
                         val difficulty = dataMap.getString("difficulty") ?: ""
+                        val steps = dataMap.getInt("steps", 0)
 
-                        saveWatchProgress(progress, level, paused, difficulty)
+                        saveWatchProgress(progress, level, paused, difficulty, steps)
                     }
                 }
             }
@@ -44,7 +45,8 @@ class PhoneWearListenerService : WearableListenerService() {
         progress: Float,
         level: Int,
         paused: Boolean,
-        difficulty: String
+        difficulty: String,
+        steps: Int
     ) {
         getSharedPreferences("watch_progress", Context.MODE_PRIVATE)
             .edit()
@@ -52,6 +54,7 @@ class PhoneWearListenerService : WearableListenerService() {
             .putInt("level", level)
             .putBoolean("paused", paused)
             .putString("difficulty", difficulty)
+            .putInt("steps", steps)
             .putLong("timestamp", System.currentTimeMillis())
             .apply()
     }
