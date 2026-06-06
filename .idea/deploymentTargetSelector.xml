@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-05-24T15:17:09.205648700Z">
+        <DropdownSelection timestamp="2026-06-06T15:07:56.063709100Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\mendo\.android\avd\Wear_OS_Large_Round.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\mendo\.android\avd\Medium_Phone.avd" />
             </handle>
           </Target>
         </DropdownSelection>
@@ -23,10 +23,10 @@
       </SelectionState>
       <SelectionState runConfigName="wear">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-05-24T11:55:08.471467300Z">
+        <DropdownSelection timestamp="2026-06-06T15:07:43.256289900Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=001451559002608" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\mendo\.android\avd\Medium_Phone.avd" />
             </handle>
           </Target>
         </DropdownSelection>

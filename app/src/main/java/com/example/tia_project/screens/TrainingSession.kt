@@ -62,7 +62,7 @@ fun TrainingSession(
     var levelEndAnnounced by remember { mutableStateOf(false) }
     var stopWarningSent by remember { mutableStateOf(false) }
     var lastDistanceForStopCheck by remember { mutableStateOf(0f) }
-    var detectedActivity by remember { mutableStateOf("A detetar...") }
+    var detectedActivity by remember { mutableStateOf("Detecting...") }
 
     val isJustVibing = difficulty == "JUST VIBING"
     val isStartingToSweat = difficulty == "STARTING TO SWEAT"
@@ -241,19 +241,13 @@ fun TrainingSession(
     }
 
     val musicLevel = when {
-        goalType == "DISTANCE" && goalValue == "1 KILOMETER" ->
-            ((distanceMeters / 100f).toInt() + 1).coerceIn(1, 10)
-
+        goalType == "DISTANCE" && goalValue == "1 KILOMETER" -> 5
+        goalType == "TIME" && goalValue == "1 MINUTE" -> 5
         goalType == "DISTANCE" && goalValue == "5 KILOMETERS" ->
             ((distanceMeters / 1000f).toInt() + 1).coerceIn(1, 5)
-
-        goalType == "TIME" && goalValue == "1 MINUTE" ->
-            1
-
         goalType == "TIME" && goalValue == "5 MINUTES" ->
             ((elapsedSeconds / 60) + 1).coerceIn(1, 5)
-
-        else -> 1
+        else -> 5
     }
 
     val audioResId = when {
@@ -262,21 +256,21 @@ fun TrainingSession(
         isJustVibing -> R.raw.relaxing_music
 
         isStartingToSweat -> when (musicLevel) {
-            1 -> R.raw.mode2song1
-            2 -> R.raw.mode2song2
-            3 -> R.raw.mode2song3
-            4 -> R.raw.mode2song4
-            5 -> R.raw.mode2song5
-            else -> R.raw.mode2song1
+            1 -> R.raw.song1
+            2 -> R.raw.song2
+            3 -> R.raw.song3
+            4 -> R.raw.song4
+            5 -> R.raw.song5
+            else -> R.raw.song1
         }
 
         isPushingLimits -> when (musicLevel) {
-            1 -> R.raw.mode3song1
-            2 -> R.raw.mode3song2
-            3 -> R.raw.mode3song3
-            4 -> R.raw.mode3song4
-            5 -> R.raw.mode3song5
-            else -> R.raw.mode3song1
+            1 -> R.raw.song1
+            2 -> R.raw.song2
+            3 -> R.raw.song3
+            4 -> R.raw.song4
+            5 -> R.raw.song5
+            else -> R.raw.song1
         }
 
         else -> R.raw.footsteps

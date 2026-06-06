@@ -392,7 +392,7 @@ private fun GoalValueLayout(
         Text(
             text = unit,
             color = textColor,
-            fontSize = 72.sp,
+            fontSize = 55.sp,
             fontWeight = FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -416,9 +416,9 @@ fun DifficultyScreen(
 ) {
     val options = listOf("JUST VIBING", "STARTING TO SWEAT", "PUSHING LIMITS")
     val colorForOption = mapOf(
-        "JUST VIBING" to Color(0xFF00C853),
-        "STARTING TO SWEAT" to Color(0xFFFFCC00),
-        "PUSHING LIMITS" to Color(0xFFD50000)
+        "JUST VIBING" to Color(0xFF2196F3),
+        "STARTING TO SWEAT" to Color(0xFFFF9800),
+        "PUSHING LIMITS" to Color(0xFF9C27B0)
     )
 
     var selectedIndex by remember { mutableStateOf(0) }
@@ -589,23 +589,50 @@ fun DifficultyScreen(
                     .align(Alignment.TopCenter)
             )
 
-            Text(
-                text = selectedOption,
-                color = colorForOption[selectedOption] ?: Color.White,
-                fontSize = when {
-                    selectedOption.length > 15 -> 54.sp
-                    selectedOption.length > 10 -> 64.sp
-                    else -> 80.sp
-                },
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Text(
+                    text = selectedOption,
+                    color = colorForOption[selectedOption] ?: Color.White,
+                    fontSize = when {
+                        selectedOption.length > 15 -> 54.sp
+                        selectedOption.length > 10 -> 64.sp
+                        else -> 80.sp
+                    },
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                val starCount = when (selectedOption) {
+                    "JUST VIBING" -> 1
+                    "STARTING TO SWEAT" -> 2
+                    "PUSHING LIMITS" -> 3
+                    else -> 1
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    repeat(starCount) {
+                        Text(
+                            text = "★",
+                            color = Color.White,
+                            fontSize = 64.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp)
+                        )
+                    }
+                }
+            }
         }
     }
-}
+} // <-- DifficultyScreen ends here
 
 @Composable
 fun SummaryScreen(
@@ -623,9 +650,9 @@ fun SummaryScreen(
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val safetyColor = Color(0xFFFFCC00)
     val difficultyColor = when (difficulty) {
-        "JUST VIBING" -> Color(0xFF00C853)
-        "STARTING TO SWEAT" -> Color(0xFFFFCC00)
-        "PUSHING LIMITS" -> Color(0xFFD50000)
+        "JUST VIBING" -> Color(0xFF2196F3)
+        "STARTING TO SWEAT" -> Color(0xFFFF9800)
+        "PUSHING LIMITS" -> Color(0xFF9C27B0)
         else -> if (darkModeEnabled) Color.White else Color.Black
     }
 
