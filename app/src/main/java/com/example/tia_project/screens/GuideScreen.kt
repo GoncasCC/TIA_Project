@@ -150,12 +150,12 @@ fun GuideScreen(
             )
 
             GuideStep.MEDIUMMODE -> speak(
-                "Starting to Sweat is a medium intensity mode. You receive progress feedback as you exercise, and the music changes as you advance through levels. If music is disabled, you will hear footsteps instead. Double tap to continue.",
+                "Starting to Sweat is a medium intensity mode. Here, your workout is divided into levels with halfway milestones. You receive progress feedback as you exercise, and the music changes as you advance through each level. If music is disabled, you will hear footsteps instead. Double tap to continue.",
                 "guide_modes"
             )
 
             GuideStep.HARDMODE -> speak(
-                "Pushing Limits is the most intense mode. The system provides motivational feedback to help you improve your pace and beat your personal best. Music is more energetic, or footsteps can be used instead. Double tap to finish the guide.",
+                "Pushing Limits is the most intense mode. Just like Starting to Sweat, it features levels where the music changes as you advance, but the system also encourages you to improve your pace and beat your personal best. You can disable the music and hear footsteps instead. Double tap to finish the guide.",
                 "guide_modes"
             )
 
