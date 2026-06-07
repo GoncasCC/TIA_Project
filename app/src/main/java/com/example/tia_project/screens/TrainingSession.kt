@@ -122,10 +122,12 @@ fun TrainingSession(
         }
     }
     LaunchedEffect(Unit) {
-        val request = PutDataMapRequest.create("/session_start").apply {
-            dataMap.putLong("timestamp", System.currentTimeMillis())
-        }.asPutDataRequest().setUrgent()
-        Wearable.getDataClient(context).putDataItem(request)
+        Wearable.getNodeClient(context).connectedNodes
+            .addOnSuccessListener { nodes ->
+                android.util.Log.d("WearDebug", "Nós encontrados: ${nodes.size}")
+                nodes.forEach { android.util.Log.d("WearDebug", "  → ${it.displayName} nearby=${it.isNearby}") }
+            }
+        sendMessageToWatch(context, "/session_start")
     }
 
     LaunchedEffect(elapsedSeconds, distanceMeters, difficulty) {
@@ -362,18 +364,15 @@ fun TrainingSession(
         }
     }
     LaunchedEffect(totalProgress, levelNumber, isPaused, difficulty) {
-        val request = PutDataMapRequest.create("/session_progress").apply {
-            dataMap.putFloat("progress", totalProgress)
-            dataMap.putInt("level", levelNumber)
-            dataMap.putBoolean("paused", isPaused)
-            dataMap.putString("difficulty", difficulty)
-            dataMap.putString("goalType", goalType)
-            dataMap.putInt("targetSteps", estimateTargetSteps(targetDistanceMeters))
-            dataMap.putLong("timestamp", System.currentTimeMillis())
-            dataMap.putBoolean("vibrationEnabled", vibrationEnabled)
-        }.asPutDataRequest().setUrgent()
-
-        Wearable.getDataClient(context).putDataItem(request)
+        sendMessageToWatch(context, "/session_progress", mapOf(
+            "progress" to totalProgress,
+            "level" to levelNumber,
+            "paused" to isPaused,
+            "difficulty" to difficulty,
+            "goalType" to goalType,
+            "targetSteps" to estimateTargetSteps(targetDistanceMeters),
+            "vibrationEnabled" to vibrationEnabled
+        ))
     }
 
     LaunchedEffect(shouldStopSessionProgress, totalProgress, isDistanceGoal) {
@@ -508,10 +507,21 @@ private fun getPersonalBestSession(context: Context): SavedSession? {
 }
 
 private fun sendWatchVibrationEvent(context: Context, vibrationType: String) {
-    val request = PutDataMapRequest.create("/watch_vibration").apply {
-        dataMap.putString("type", vibrationType)
-        dataMap.putLong("timestamp", System.currentTimeMillis())
-    }.asPutDataRequest().setUrgent()
+    sendMessageToWatch(context, "/watch_vibration", mapOf("type" to vibrationType))
+}
 
-    Wearable.getDataClient(context).putDataItem(request)
+private fun sendMessageToWatch(context: Context, path: String, data: Map<String, Any> = emptyMap()) {
+    val jsonData = data.entries.joinToString(",", "{", "}") { (k, v) ->
+        "\"$k\":${if (v is String) "\"$v\"" else v}"
+    }
+    val payload = jsonData.toByteArray(Charsets.UTF_8)
+
+    Wearable.getNodeClient(context).connectedNodes
+        .addOnSuccessListener { nodes ->
+            nodes.forEach { node ->
+                Wearable.getMessageClient(context).sendMessage(node.id, path, payload)
+                    .addOnSuccessListener { android.util.Log.d("WearDebug", "✓ $path enviado para ${node.displayName}") }
+                    .addOnFailureListener { android.util.Log.e("WearDebug", "✗ $path falhou: ${it.message}") }
+            }
+        }
 }

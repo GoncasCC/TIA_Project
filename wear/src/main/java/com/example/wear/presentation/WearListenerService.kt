@@ -41,26 +41,29 @@ object WearSessionRepository {
 class WearListenerService : WearableListenerService() {
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
+        android.util.Log.d("WearDebug", "onDataChanged chamado com ${dataEvents.count} eventos")
+
         dataEvents.forEach { event ->
+            android.util.Log.d("WearDebug", "evento: type=${event.type} path=${event.dataItem.uri.path}")
+
             if (event.type != DataEvent.TYPE_CHANGED) return@forEach
             val path = event.dataItem.uri.path
             val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
 
             when (path) {
                 "/session_start" -> {
+                    android.util.Log.d("WearDebug", "✓ /session_start recebido no relógio")
                     WearSessionRepository.triggerStepReset()
                     WearSessionRepository.setSessionActive(true)
                 }
-
                 "/session_progress" -> {
+                    android.util.Log.d("WearDebug", "✓ /session_progress recebido no relógio")
                     WearSessionRepository.setSessionActive(true)
                     val current = WearSessionRepository.session.value
                     val newGoalType = dataMap.getString("goalType") ?: "DISTANCE"
-
                     if (newGoalType != current.goalType) {
                         WearSessionRepository.triggerStepReset()
                     }
-
                     WearSessionRepository.update(
                         SessionData(
                             progress = dataMap.getFloat("progress", current.progress),
@@ -73,7 +76,6 @@ class WearListenerService : WearableListenerService() {
                         )
                     )
                 }
-
                 "/watch_vibration" -> {
                     val type = dataMap.getString("type") ?: return@forEach
                     val enabled = WearSessionRepository.session.value.vibrationEnabled

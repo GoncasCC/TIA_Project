@@ -6,18 +6,25 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.wear.presentation.screens.WatchProgressScreen
 import com.example.wear.presentation.screens.WaitingScreen
+import com.example.wear.presentation.screens.WatchProgressScreen
+import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import org.json.JSONObject
 
-class MainActivity : ComponentActivity(), SensorEventListener {
+class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnMessageReceivedListener {
 
     private lateinit var sensorManager: SensorManager
     private var stepCounterSensor: Sensor? = null
@@ -55,13 +62,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     onPauseToggle = {
                         val newPaused = !session.paused
                         sendWatchCommand(if (newPaused) "pause" else "resume")
-                        sendWatchProgress(
-                            progress = session.progress,
-                            level = session.level,
-                            paused = newPaused,
-                            difficulty = session.difficulty,
-                            steps = 0
-                        )
+                        sendWatchProgress(session.progress, session.level, newPaused, session.difficulty, 0)
                     },
                     onEndSession = {
                         WearSessionRepository.setSessionActive(false)
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
+        Wearable.getMessageClient(this).addListener(this)
         stepCounterSensor?.also { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
         }
@@ -81,7 +83,55 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onPause() {
         super.onPause()
+        Wearable.getMessageClient(this).removeListener(this)
         sensorManager.unregisterListener(this)
+    }
+
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        val path = messageEvent.path
+        android.util.Log.d("WearDebug", "✓ Mensagem recebida: $path")
+
+        try {
+            val json = JSONObject(String(messageEvent.data, Charsets.UTF_8))
+
+            when (path) {
+                "/session_start" -> {
+                    android.util.Log.d("WearDebug", "✓ /session_start recebido")
+                    WearSessionRepository.triggerStepReset()
+                    WearSessionRepository.setSessionActive(true)
+                }
+                "/session_progress" -> {
+                    android.util.Log.d("WearDebug", "✓ /session_progress recebido")
+                    WearSessionRepository.setSessionActive(true)
+                    val current = WearSessionRepository.session.value
+                    val newGoalType = json.optString("goalType", "DISTANCE")
+                    if (newGoalType != current.goalType) WearSessionRepository.triggerStepReset()
+
+                    WearSessionRepository.update(SessionData(
+                        progress = json.optDouble("progress", current.progress.toDouble()).toFloat(),
+                        level = json.optInt("level", current.level),
+                        paused = json.optBoolean("paused", false),
+                        difficulty = json.optString("difficulty", current.difficulty),
+                        goalType = newGoalType,
+                        targetSteps = json.optInt("targetSteps", 1).coerceAtLeast(1),
+                        vibrationEnabled = json.optBoolean("vibrationEnabled", true)
+                    ))
+                }
+                "/watch_vibration" -> {
+                    val type = json.optString("type", "")
+                    val enabled = WearSessionRepository.session.value.vibrationEnabled
+                    if (enabled && type.isNotEmpty()) vibrateForEvent(type)
+                }
+            }
+        } catch (e: Exception) {
+            // /session_start chega sem JSON
+            when (path) {
+                "/session_start" -> {
+                    WearSessionRepository.triggerStepReset()
+                    WearSessionRepository.setSessionActive(true)
+                }
+            }
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -91,7 +141,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
         val totalSteps = event.values[0]
         if (initialSteps == null) initialSteps = totalSteps
-
         val sessionSteps = (totalSteps - (initialSteps ?: totalSteps)).toInt()
 
         if (session.goalType == "DISTANCE") {
@@ -104,25 +153,45 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun sendWatchCommand(command: String) {
-        val request = PutDataMapRequest.create("/watch_command").apply {
-            dataMap.putString("command", command)
-            dataMap.putLong("timestamp", System.currentTimeMillis())
-        }.asPutDataRequest().setUrgent()
-        Wearable.getDataClient(this).putDataItem(request)
+        val payload = "{\"command\":\"$command\"}".toByteArray(Charsets.UTF_8)
+        Wearable.getNodeClient(this).connectedNodes
+            .addOnSuccessListener { nodes ->
+                nodes.forEach { node ->
+                    Wearable.getMessageClient(this).sendMessage(node.id, "/watch_command", payload)
+                }
+            }
     }
 
-    private fun sendWatchProgress(
-        progress: Float, level: Int, paused: Boolean,
-        difficulty: String, steps: Int
-    ) {
-        val request = PutDataMapRequest.create("/watch_progress").apply {
-            dataMap.putFloat("progress", progress)
-            dataMap.putInt("level", level)
-            dataMap.putBoolean("paused", paused)
-            dataMap.putString("difficulty", difficulty)
-            dataMap.putInt("steps", steps)
-            dataMap.putLong("timestamp", System.currentTimeMillis())
-        }.asPutDataRequest().setUrgent()
-        Wearable.getDataClient(this).putDataItem(request)
+    private fun sendWatchProgress(progress: Float, level: Int, paused: Boolean, difficulty: String, steps: Int) {
+        val payload = """{"progress":$progress,"level":$level,"paused":$paused,"difficulty":"$difficulty","steps":$steps}"""
+            .toByteArray(Charsets.UTF_8)
+        Wearable.getNodeClient(this).connectedNodes
+            .addOnSuccessListener { nodes ->
+                nodes.forEach { node ->
+                    Wearable.getMessageClient(this).sendMessage(node.id, "/watch_progress", payload)
+                }
+            }
+    }
+
+    private fun vibrateForEvent(type: String) {
+        val pattern = when (type) {
+            "halfway"          -> longArrayOf(0, 120)
+            "level_complete"   -> longArrayOf(0, 150, 100, 150)
+            "stop_warning"     -> longArrayOf(0, 500)
+            "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
+            else               -> longArrayOf(0, 100)
+        }
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+        }
     }
 }

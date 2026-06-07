@@ -22,7 +22,7 @@ fun WaitingScreen() {
         Text(
             text = "Waiting\nfor session",
             color = Color.White,
-            fontSize = 18.sp,
+            fontSize = 50.sp,
             textAlign = TextAlign.Center
         )
     }
