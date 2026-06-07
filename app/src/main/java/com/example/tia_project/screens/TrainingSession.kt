@@ -32,6 +32,9 @@ import android.media.MediaPlayer
 import com.example.tia_project.R
 import com.example.tia_project.sensors.ActivityRecognitionManager
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.tia_project.WatchDataRepository
 
 @Composable
 fun TrainingSession(
@@ -63,6 +66,8 @@ fun TrainingSession(
     var stopWarningSent by remember { mutableStateOf(false) }
     var lastDistanceForStopCheck by remember { mutableStateOf(0f) }
     var detectedActivity by remember { mutableStateOf("Detecting...") }
+    val watchProgress by WatchDataRepository.progress.collectAsState()
+    val watchCommand by WatchDataRepository.command.collectAsState()
 
     val isJustVibing = difficulty == "JUST VIBING"
     val isStartingToSweat = difficulty == "STARTING TO SWEAT"
@@ -115,6 +120,12 @@ fun TrainingSession(
         onDispose {
             activityRecognitionManager.stopListening()
         }
+    }
+    LaunchedEffect(Unit) {
+        val request = PutDataMapRequest.create("/session_start").apply {
+            dataMap.putLong("timestamp", System.currentTimeMillis())
+        }.asPutDataRequest().setUrgent()
+        Wearable.getDataClient(context).putDataItem(request)
     }
 
     LaunchedEffect(elapsedSeconds, distanceMeters, difficulty) {
@@ -173,6 +184,60 @@ fun TrainingSession(
         }
     }
 
+    LaunchedEffect(watchProgress) {
+        isPaused = watchProgress.paused
+
+        if (isDistanceGoal) {
+            distanceMeters = watchProgress.progress * targetDistanceMeters
+        } else {
+            elapsedSeconds = (watchProgress.progress * targetTimeSeconds)
+                .toInt()
+                .coerceIn(0, targetTimeSeconds)
+        }
+    }
+
+    var lastHandledCommandTimestamp by remember { mutableStateOf(0L) }
+
+    fun finishSession(endedEarly: Boolean) {
+        saveTrainingSession(
+            context = context,
+            activity = if (detectedActivity.isNotBlank() && detectedActivity != "A detetar...") detectedActivity else activity,
+            goalType = goalType,
+            goalValue = goalValue,
+            difficulty = difficulty,
+            distanceMeters = distanceMeters,
+            elapsedSeconds = elapsedSeconds,
+            endedEarly = endedEarly
+        )
+    }
+
+    LaunchedEffect(watchCommand) {
+        if (watchCommand.timestamp <= lastHandledCommandTimestamp) return@LaunchedEffect
+        lastHandledCommandTimestamp = watchCommand.timestamp
+
+        when (watchCommand.command) {
+            "pause" -> {
+                isPaused = true
+                speak("Workout paused.", "watch_pause")
+                mediaPlayer?.takeIf { it.isPlaying }?.pause()
+            }
+            "resume" -> {
+                isPaused = false
+                speak("Workout resumed.", "watch_resume")
+                mediaPlayer?.takeIf { !it.isPlaying }?.start()
+            }
+            "end_session" -> {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+                finishSession(endedEarly = true)
+                speak("Workout ended.", "watch_end")
+                delay(1200)
+                onCancel()
+            }
+        }
+    }
+
     LaunchedEffect(distanceMeters, difficulty) {
         if (!isPushingLimits) return@LaunchedEffect
 
@@ -199,32 +264,6 @@ fun TrainingSession(
         onDispose {
             textToSpeech.stop()
             textToSpeech.shutdown()
-        }
-    }
-
-    var lastWatchProgressTimestamp by remember { mutableStateOf(0L) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(500)
-
-            val prefs = context.getSharedPreferences("watch_progress", Context.MODE_PRIVATE)
-            val progressFromWatch = prefs.getFloat("progress", 0f)
-            val pausedFromWatch = prefs.getBoolean("paused", false)
-            val timestamp = prefs.getLong("timestamp", 0L)
-
-            if (timestamp > lastWatchProgressTimestamp) {
-                lastWatchProgressTimestamp = timestamp
-                isPaused = pausedFromWatch
-
-                if (isDistanceGoal) {
-                    distanceMeters = progressFromWatch * targetDistanceMeters
-                } else {
-                    elapsedSeconds = (progressFromWatch * targetTimeSeconds)
-                        .toInt()
-                        .coerceIn(0, targetTimeSeconds)
-                }
-            }
         }
     }
 
@@ -391,60 +430,6 @@ fun TrainingSession(
     LaunchedEffect(levelNumber) {
         halfwayAnnounced = false
         levelEndAnnounced = false
-    }
-
-    fun finishSession(endedEarly: Boolean) {
-        saveTrainingSession(
-            context = context,
-            activity = if (detectedActivity.isNotBlank() && detectedActivity != "A detetar...") detectedActivity else activity,
-            goalType = goalType,
-            goalValue = goalValue,
-            difficulty = difficulty,
-            distanceMeters = distanceMeters,
-            elapsedSeconds = elapsedSeconds,
-            endedEarly = endedEarly
-        )
-    }
-
-    var lastWatchCommandTimestamp by remember { mutableStateOf(0L) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(500)
-
-            val prefs = context.getSharedPreferences("watch_commands", Context.MODE_PRIVATE)
-            val command = prefs.getString("command", null)
-            val timestamp = prefs.getLong("timestamp", 0L)
-
-            if (timestamp > lastWatchCommandTimestamp) {
-                lastWatchCommandTimestamp = timestamp
-
-                when (command) {
-                    "pause" -> {
-                        isPaused = true
-                        speak("Workout paused.", "watch_pause")
-                        mediaPlayer?.takeIf { it.isPlaying }?.pause()
-                    }
-
-                    "resume" -> {
-                        isPaused = false
-                        speak("Workout resumed.", "watch_resume")
-                        mediaPlayer?.takeIf { !it.isPlaying }?.start()
-                    }
-
-                    "end_session" -> {
-                        mediaPlayer?.stop()
-                        mediaPlayer?.release()
-                        mediaPlayer = null
-
-                        finishSession(endedEarly = true)
-                        speak("Workout ended.", "watch_end")
-                        delay(1200)
-                        onCancel()
-                    }
-                }
-            }
-        }
     }
 
     LaunchedEffect(totalProgress) {

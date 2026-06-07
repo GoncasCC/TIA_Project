@@ -18,14 +18,9 @@
         <service
             android:name=".PhoneWearListenerService"
             android:exported="true">
-
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
             </intent-filter>
-
-            <meta-data
-                android:name="com.google.android.gms.wearable.BIND_LISTENER"
-                android:value="true" />
         </service>
 
         <activity

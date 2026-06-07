@@ -1,6 +1,5 @@
 package com.example.tia_project
 
-import android.content.Context
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.WearableListenerService
@@ -16,7 +15,8 @@ class PhoneWearListenerService : WearableListenerService() {
                 when (path) {
                     "/watch_command" -> {
                         val command = dataMap.getString("command") ?: return@forEach
-                        saveWatchCommand(command)
+                        val timestamp = dataMap.getLong("timestamp")
+                        WatchDataRepository.updateCommand(command, timestamp)
                     }
 
                     "/watch_progress" -> {
@@ -25,37 +25,10 @@ class PhoneWearListenerService : WearableListenerService() {
                         val paused = dataMap.getBoolean("paused")
                         val difficulty = dataMap.getString("difficulty") ?: ""
                         val steps = dataMap.getInt("steps", 0)
-
-                        saveWatchProgress(progress, level, paused, difficulty, steps)
+                        WatchDataRepository.updateProgress(progress, level, paused, difficulty, steps)
                     }
                 }
             }
         }
-    }
-
-    private fun saveWatchCommand(command: String) {
-        getSharedPreferences("watch_commands", Context.MODE_PRIVATE)
-            .edit()
-            .putString("command", command)
-            .putLong("timestamp", System.currentTimeMillis())
-            .apply()
-    }
-
-    private fun saveWatchProgress(
-        progress: Float,
-        level: Int,
-        paused: Boolean,
-        difficulty: String,
-        steps: Int
-    ) {
-        getSharedPreferences("watch_progress", Context.MODE_PRIVATE)
-            .edit()
-            .putFloat("progress", progress)
-            .putInt("level", level)
-            .putBoolean("paused", paused)
-            .putString("difficulty", difficulty)
-            .putInt("steps", steps)
-            .putLong("timestamp", System.currentTimeMillis())
-            .apply()
     }
 }

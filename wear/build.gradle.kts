@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.wear"
+        applicationId = "com.example.tia_project"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
