@@ -6,23 +6,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
 import com.example.tia_project.screens.*
 
 class MainActivity : ComponentActivity() {
@@ -60,6 +51,10 @@ class MainActivity : ComponentActivity() {
             var musicEnabled by remember { mutableStateOf(true) }
             var vibrationEnabled by remember { mutableStateOf(true) }
             var darkModeEnabled by remember { mutableStateOf(true) }
+
+            // NOVAS VARIÁVEIS PARA GUARDAR OS DADOS DO RESUMO DA SESSÃO
+            var finalDistance by remember { mutableStateOf(0f) }
+            var finalTime by remember { mutableStateOf(0) }
 
             fun goToMenu() {
                 menuInstance++
@@ -194,14 +189,28 @@ class MainActivity : ComponentActivity() {
                     musicEnabled = musicEnabled,
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
-                    onFinish = { goToMenu() },
+                    onFinish = { distance, time ->
+                        // ATUALIZADO: Guarda os dados e encaminha para o resumo
+                        finalDistance = distance
+                        finalTime = time
+                        currentScreen = "session_summary"
+                    },
                     onCancel = { goToMenu() }
+                )
+
+                // NOVO ECRÃ: Resumo da sessão
+                "session_summary" -> SessionSummaryScreen(
+                    distanceKm = finalDistance,
+                    timeSeconds = finalTime,
+                    voiceoverEnabled = voiceoverEnabled,
+                    vibrationEnabled = vibrationEnabled,
+                    darkModeEnabled = darkModeEnabled,
+                    onBackToMenu = { goToMenu() }
                 )
             }
         }
     }
 }
-
 
 @Composable
 fun SimpleTextScreen(

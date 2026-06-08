@@ -46,7 +46,7 @@ fun TrainingSession(
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
     musicEnabled: Boolean,
-    onFinish: () -> Unit,
+    onFinish: (Float, Int) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
@@ -187,7 +187,6 @@ fun TrainingSession(
     }
 
     LaunchedEffect(watchProgress) {
-        isPaused = watchProgress.paused
 
         if (isDistanceGoal) {
             distanceMeters = watchProgress.progress * targetDistanceMeters
@@ -235,7 +234,8 @@ fun TrainingSession(
                 finishSession(endedEarly = true)
                 speak("Workout ended.", "watch_end")
                 delay(1200)
-                onCancel()
+                // SUBSTITUI O onCancel() POR ISTO:
+                onFinish(distanceMeters / 1000f, elapsedSeconds)
             }
         }
     }
@@ -442,7 +442,7 @@ fun TrainingSession(
             sendWatchVibrationEvent(context, "session_complete")
             speak("Workout complete.", "workout_complete")
             delay(1200)
-            onFinish()
+            onFinish(distanceMeters / 1000f, elapsedSeconds)
         }
     }
 
