@@ -34,10 +34,16 @@ fun WatchProgressScreen(
     isStopped: Boolean = false,
     difficulty: String = "JUST VIBING",
     onPauseToggle: () -> Unit = {},
+    onResume: () -> Unit = {},
     onEndSession: () -> Unit = {},
     onSpeakRequest: (String) -> Unit = {}
 ) {
     var askingToEnd by remember { mutableStateOf(false) }
+    var wasPausedBeforeAsking by remember { mutableStateOf(false) }
+
+
+    var localPaused by remember { mutableStateOf(paused) }
+    LaunchedEffect(paused) { localPaused = paused }
 
     val context = LocalContext.current
     val vibrator = remember(context) {
@@ -51,7 +57,7 @@ fun WatchProgressScreen(
 
     val progressColor = when {
         isStopped -> Color(0xFF7B1FA2)
-        paused -> Color(0xFF7B1FA2)
+        localPaused -> Color(0xFF7B1FA2)
         difficulty == "PUSHING LIMITS" -> Color(0xFFFF6F00)
         else -> Color(0xFF1565C0)
     }
@@ -67,7 +73,12 @@ fun WatchProgressScreen(
                         launch {
                             detectTapGestures(
                                 onTap = {
+
                                     askingToEnd = false
+                                    if (!wasPausedBeforeAsking) {
+                                        localPaused = false
+                                        onResume()
+                                    }
                                 },
                                 onDoubleTap = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -98,6 +109,7 @@ fun WatchProgressScreen(
                                         @Suppress("DEPRECATION")
                                         vibrator.vibrate(150)
                                     }
+                                    localPaused = !localPaused
                                     onPauseToggle()
                                 },
                                 onLongPress = {
@@ -108,7 +120,10 @@ fun WatchProgressScreen(
                                         vibrator.vibrate(400)
                                     }
 
-                                    if (!paused) {
+                                    wasPausedBeforeAsking = localPaused
+
+                                    if (!localPaused) {
+                                        localPaused = true
                                         onPauseToggle()
                                     }
 
@@ -147,7 +162,7 @@ fun WatchProgressScreen(
                 )
             }
             Text(
-                text = if (paused || isStopped) "PAUSED" else "L$level",
+                text = if (localPaused || isStopped) "PAUSED" else "L$level",
                 color = Color.White,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold

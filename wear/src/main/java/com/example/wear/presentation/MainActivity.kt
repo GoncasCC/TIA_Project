@@ -79,6 +79,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         sendWatchCommand(if (newPaused) "pause" else "resume")
                         sendWatchProgress(session.progress, session.level, newPaused, session.difficulty, 0)
                     },
+                    onResume = {
+                        sendWatchCommand("resume")
+                        sendWatchProgress(session.progress, session.level, false, session.difficulty, 0)
+                    },
                     onEndSession = {
                         WearSessionRepository.setSessionActive(false)
                         sendWatchCommand("end_session")

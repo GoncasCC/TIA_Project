@@ -89,7 +89,8 @@ fun TrainingSession(
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
     var isStoppedByInactivity by remember { mutableStateOf(false) }
-    val shouldStopSessionProgress = isPaused || isStoppedByInactivity
+    var isStarting by remember { mutableStateOf(true) }
+    val shouldStopSessionProgress = isPaused || isStoppedByInactivity || isStarting
 
     fun speak(text: String, id: String) {
         if (isTtsReady && voiceoverEnabled) {
@@ -125,9 +126,18 @@ fun TrainingSession(
         Wearable.getNodeClient(context).connectedNodes
             .addOnSuccessListener { nodes ->
                 android.util.Log.d("WearDebug", "Nós encontrados: ${nodes.size}")
-                nodes.forEach { android.util.Log.d("WearDebug", "  → ${it.displayName} nearby=${it.isNearby}") }
+                nodes.forEach {
+                    android.util.Log.d(
+                        "WearDebug",
+                        "  → ${it.displayName} nearby=${it.isNearby}"
+                    )
+                }
             }
         sendMessageToWatch(context, "/session_start")
+
+
+        delay(2500)
+        isStarting = false
     }
 
     LaunchedEffect(elapsedSeconds, distanceMeters, difficulty) {
@@ -222,17 +232,26 @@ fun TrainingSession(
         when (cmd) {
             "pause" -> {
                 isPaused = true
-                speak("Workout paused.", "watch_pause")
-                try { mediaPlayer?.pause() } catch (e: Exception) { }
+                try {
+                    mediaPlayer?.pause()
+                } catch (e: Exception) {
+                }
             }
+
             "resume" -> {
                 isPaused = false
-                speak("Workout resumed.", "watch_resume")
-                try { mediaPlayer?.start() } catch (e: Exception) { }
+                try {
+                    mediaPlayer?.start()
+                } catch (e: Exception) {
+                }
             }
+
             "end_session" -> {
 
-                try { mediaPlayer?.pause() } catch (e: Exception) { }
+                try {
+                    mediaPlayer?.pause()
+                } catch (e: Exception) {
+                }
                 finishSession(endedEarly = true)
                 speak("Workout ended.", "watch_end")
                 delay(1200)
@@ -287,8 +306,10 @@ fun TrainingSession(
         goalType == "TIME" && goalValue == "1 MINUTE" -> 5
         goalType == "DISTANCE" && goalValue == "5 KILOMETERS" ->
             ((distanceMeters / 1000f).toInt() + 1).coerceIn(1, 5)
+
         goalType == "TIME" && goalValue == "5 MINUTES" ->
             ((elapsedSeconds / 60) + 1).coerceIn(1, 5)
+
         else -> 5
     }
 
@@ -373,20 +394,23 @@ fun TrainingSession(
 
             try {
                 activityRecognitionManager.stopListening()
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+            }
         }
     }
     LaunchedEffect(totalProgress, levelNumber, isPaused, difficulty) {
-        sendMessageToWatch(context, "/session_progress", mapOf(
-            "progress" to totalProgress,
-            "level" to levelNumber,
-            "paused" to isPaused,
-            "isStopped" to isStoppedByInactivity,
-            "difficulty" to difficulty,
-            "goalType" to goalType,
-            "targetSteps" to estimateTargetSteps(targetDistanceMeters),
-            "vibrationEnabled" to vibrationEnabled
-        ))
+        sendMessageToWatch(
+            context, "/session_progress", mapOf(
+                "progress" to totalProgress,
+                "level" to levelNumber,
+                "paused" to isPaused,
+                "isStopped" to isStoppedByInactivity,
+                "difficulty" to difficulty,
+                "goalType" to goalType,
+                "targetSteps" to estimateTargetSteps(targetDistanceMeters),
+                "vibrationEnabled" to vibrationEnabled
+            )
+        )
     }
 
     LaunchedEffect(shouldStopSessionProgress, totalProgress, isDistanceGoal) {
@@ -446,6 +470,7 @@ fun TrainingSession(
     }
 
     LaunchedEffect(totalProgress) {
+        if (isStarting) return@LaunchedEffect
         if (totalProgress >= 1f) {
             mediaPlayer?.stop()
             mediaPlayer?.release()
@@ -524,7 +549,11 @@ private fun sendWatchVibrationEvent(context: Context, vibrationType: String) {
     sendMessageToWatch(context, "/watch_vibration", mapOf("type" to vibrationType))
 }
 
-private fun sendMessageToWatch(context: Context, path: String, data: Map<String, Any> = emptyMap()) {
+private fun sendMessageToWatch(
+    context: Context,
+    path: String,
+    data: Map<String, Any> = emptyMap()
+) {
     val jsonData = data.entries.joinToString(",", "{", "}") { (k, v) ->
         "\"$k\":${if (v is String) "\"$v\"" else v}"
     }
@@ -534,8 +563,18 @@ private fun sendMessageToWatch(context: Context, path: String, data: Map<String,
         .addOnSuccessListener { nodes ->
             nodes.forEach { node ->
                 Wearable.getMessageClient(context).sendMessage(node.id, path, payload)
-                    .addOnSuccessListener { android.util.Log.d("WearDebug", "✓ $path enviado para ${node.displayName}") }
-                    .addOnFailureListener { android.util.Log.e("WearDebug", "✗ $path falhou: ${it.message}") }
+                    .addOnSuccessListener {
+                        android.util.Log.d(
+                            "WearDebug",
+                            "✓ $path enviado para ${node.displayName}"
+                        )
+                    }
+                    .addOnFailureListener {
+                        android.util.Log.e(
+                            "WearDebug",
+                            "✗ $path falhou: ${it.message}"
+                        )
+                    }
             }
         }
 }
