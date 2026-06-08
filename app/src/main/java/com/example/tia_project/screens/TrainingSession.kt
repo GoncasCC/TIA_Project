@@ -216,25 +216,26 @@ fun TrainingSession(
         if (watchCommand.timestamp <= lastHandledCommandTimestamp) return@LaunchedEffect
         lastHandledCommandTimestamp = watchCommand.timestamp
 
-        when (watchCommand.command) {
+        // Garantir que a palavra não tem espaços ou lixo
+        val cmd = watchCommand.command.replace("\"", "").trim()
+
+        when (cmd) {
             "pause" -> {
                 isPaused = true
                 speak("Workout paused.", "watch_pause")
-                mediaPlayer?.takeIf { it.isPlaying }?.pause()
+                try { mediaPlayer?.pause() } catch (e: Exception) { }
             }
             "resume" -> {
                 isPaused = false
                 speak("Workout resumed.", "watch_resume")
-                mediaPlayer?.takeIf { !it.isPlaying }?.start()
+                try { mediaPlayer?.start() } catch (e: Exception) { }
             }
             "end_session" -> {
-                mediaPlayer?.stop()
-                mediaPlayer?.release()
-                mediaPlayer = null
+                // Apenas pausa, NÃO destrói o reprodutor aqui para evitar crashes!
+                try { mediaPlayer?.pause() } catch (e: Exception) { }
                 finishSession(endedEarly = true)
                 speak("Workout ended.", "watch_end")
                 delay(1200)
-                // SUBSTITUI O onCancel() POR ISTO:
                 onFinish(distanceMeters / 1000f, elapsedSeconds)
             }
         }
@@ -347,20 +348,32 @@ fun TrainingSession(
     }
 
     LaunchedEffect(shouldStopSessionProgress) {
-        mediaPlayer?.let { player ->
-            if (shouldStopSessionProgress && player.isPlaying) {
-                player.pause()
-            } else if (!shouldStopSessionProgress && !player.isPlaying) {
-                player.start()
+        try {
+            mediaPlayer?.let { player ->
+                if (shouldStopSessionProgress && player.isPlaying) {
+                    player.pause()
+                } else if (!shouldStopSessionProgress && !player.isPlaying) {
+                    player.start()
+                }
             }
+        } catch (e: Exception) {
+            // Silencia erros do MediaPlayer que possam causar crash
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+            } catch (e: Exception) {
+                // Ignorar erros caso já tenha sido limpo
+            }
             mediaPlayer = null
+
+            try {
+                activityRecognitionManager.stopListening()
+            } catch (e: Exception) {}
         }
     }
     LaunchedEffect(totalProgress, levelNumber, isPaused, difficulty) {

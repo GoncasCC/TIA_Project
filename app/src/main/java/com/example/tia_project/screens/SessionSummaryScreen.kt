@@ -135,14 +135,6 @@ fun SessionSummaryScreen(
             )
 
             Spacer(modifier = Modifier.height(60.dp))
-
-            Text(
-                text = "DOUBLE TAP TO\nRETURN TO MENU",
-                color = Color.Gray,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

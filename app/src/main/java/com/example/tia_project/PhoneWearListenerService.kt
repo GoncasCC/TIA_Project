@@ -8,25 +8,25 @@ import org.json.JSONObject
 
 class PhoneWearListenerService : WearableListenerService() {
 
-    // OBRIGATÓRIO: Receber os comandos rápidos (Message API)
     override fun onMessageReceived(messageEvent: MessageEvent) {
         val path = messageEvent.path
         if (path == "/watch_command") {
             try {
-                // Tenta ler como JSON (ex: {"command": "pause"})
                 val jsonString = String(messageEvent.data, Charsets.UTF_8)
                 val json = JSONObject(jsonString)
                 val command = json.getString("command")
-                WatchDataRepository.updateCommand(command, System.currentTimeMillis())
+                // Limpa espaços e aspas extra
+                val cleanCommand = command.replace("\"", "").trim()
+                WatchDataRepository.updateCommand(cleanCommand, System.currentTimeMillis())
             } catch (e: Exception) {
-                // Se falhar, lê como texto direto (ex: "pause")
-                val command = String(messageEvent.data, Charsets.UTF_8)
-                WatchDataRepository.updateCommand(command, System.currentTimeMillis())
+                // Caso não seja JSON, lê como texto puro
+                val raw = String(messageEvent.data, Charsets.UTF_8)
+                val cleanCommand = raw.replace("\"", "").trim()
+                WatchDataRepository.updateCommand(cleanCommand, System.currentTimeMillis())
             }
         }
     }
 
-    // OBRIGATÓRIO: Receber os estados contínuos (Data API)
     override fun onDataChanged(dataEvents: com.google.android.gms.wearable.DataEventBuffer) {
         dataEvents.forEach { event ->
             if (event.type == DataEvent.TYPE_CHANGED) {
@@ -44,8 +44,9 @@ class PhoneWearListenerService : WearableListenerService() {
                     }
                     "/watch_command" -> {
                         val command = dataMap.getString("command") ?: return@forEach
+                        val cleanCommand = command.replace("\"", "").trim()
                         val timestamp = dataMap.getLong("timestamp", System.currentTimeMillis())
-                        WatchDataRepository.updateCommand(command, timestamp)
+                        WatchDataRepository.updateCommand(cleanCommand, timestamp)
                     }
                 }
             }
