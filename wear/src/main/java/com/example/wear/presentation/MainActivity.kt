@@ -32,20 +32,20 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var stepCounterSensor: Sensor? = null
     private var initialSteps: Float? = null
 
-    // 1. A variável do TTS declarada corretamente aqui
+
     private var tts: TextToSpeech? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 2. Inicialização do TextToSpeech (Unificado aqui)
+
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale.US
             }
         }
 
-        // 3. Inicialização dos Sensores e Permissões
+
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1001)
         }
 
-        // 4. Bloco setContent do Compose
+
         setContent {
             val session by WearSessionRepository.session.collectAsState()
             val sessionActive by WearSessionRepository.sessionActive.collectAsState()
@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         sendWatchCommand("end_session")
                     },
                     onSpeakRequest = { text ->
-                        // O TTS sendo chamado quando a tela do Compose pedir
+
                         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "end_confirm")
                     }
                 )
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
-    // 5. O onDestroy liberando a memória do TTS corretamente
+
     override fun onDestroy() {
         tts?.stop()
         tts?.shutdown()

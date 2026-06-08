@@ -216,7 +216,7 @@ fun TrainingSession(
         if (watchCommand.timestamp <= lastHandledCommandTimestamp) return@LaunchedEffect
         lastHandledCommandTimestamp = watchCommand.timestamp
 
-        // Garantir que a palavra não tem espaços ou lixo
+
         val cmd = watchCommand.command.replace("\"", "").trim()
 
         when (cmd) {
@@ -231,7 +231,7 @@ fun TrainingSession(
                 try { mediaPlayer?.start() } catch (e: Exception) { }
             }
             "end_session" -> {
-                // Apenas pausa, NÃO destrói o reprodutor aqui para evitar crashes!
+
                 try { mediaPlayer?.pause() } catch (e: Exception) { }
                 finishSession(endedEarly = true)
                 speak("Workout ended.", "watch_end")
@@ -357,7 +357,7 @@ fun TrainingSession(
                 }
             }
         } catch (e: Exception) {
-            // Silencia erros do MediaPlayer que possam causar crash
+
         }
     }
 
@@ -367,7 +367,7 @@ fun TrainingSession(
                 mediaPlayer?.stop()
                 mediaPlayer?.release()
             } catch (e: Exception) {
-                // Ignorar erros caso já tenha sido limpo
+
             }
             mediaPlayer = null
 

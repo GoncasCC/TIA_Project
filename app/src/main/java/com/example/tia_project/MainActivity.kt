@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
             var vibrationEnabled by remember { mutableStateOf(true) }
             var darkModeEnabled by remember { mutableStateOf(true) }
 
-            // NOVAS VARIÁVEIS PARA GUARDAR OS DADOS DO RESUMO DA SESSÃO
+
             var finalDistance by remember { mutableStateOf(0f) }
             var finalTime by remember { mutableStateOf(0) }
 
@@ -190,7 +190,7 @@ class MainActivity : ComponentActivity() {
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
                     onFinish = { distance, time ->
-                        // ATUALIZADO: Guarda os dados e encaminha para o resumo
+
                         finalDistance = distance
                         finalTime = time
                         currentScreen = "session_summary"
@@ -198,7 +198,7 @@ class MainActivity : ComponentActivity() {
                     onCancel = { goToMenu() }
                 )
 
-                // NOVO ECRÃ: Resumo da sessão
+
                 "session_summary" -> SessionSummaryScreen(
                     distanceKm = finalDistance,
                     timeSeconds = finalTime,

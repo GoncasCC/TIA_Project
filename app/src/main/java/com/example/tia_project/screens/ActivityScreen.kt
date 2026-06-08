@@ -632,7 +632,7 @@ fun DifficultyScreen(
             }
         }
     }
-} // <-- DifficultyScreen ends here
+}
 
 @Composable
 fun SummaryScreen(

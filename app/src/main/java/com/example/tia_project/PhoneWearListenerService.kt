@@ -15,11 +15,11 @@ class PhoneWearListenerService : WearableListenerService() {
                 val jsonString = String(messageEvent.data, Charsets.UTF_8)
                 val json = JSONObject(jsonString)
                 val command = json.getString("command")
-                // Limpa espaços e aspas extra
+
                 val cleanCommand = command.replace("\"", "").trim()
                 WatchDataRepository.updateCommand(cleanCommand, System.currentTimeMillis())
             } catch (e: Exception) {
-                // Caso não seja JSON, lê como texto puro
+
                 val raw = String(messageEvent.data, Charsets.UTF_8)
                 val cleanCommand = raw.replace("\"", "").trim()
                 WatchDataRepository.updateCommand(cleanCommand, System.currentTimeMillis())

@@ -62,8 +62,7 @@ fun OptionsScreen(
         else -> false
     }
 
-    // ✅ rememberUpdatedState — os lambdas capturam sempre o valor mais recente
-    // sem reiniciar o bloco pointerInput (que cancelaria o delay/onBack)
+
     val currentOnBack by rememberUpdatedState(onBack)
     val currentVibrationEnabled by rememberUpdatedState(vibrationEnabled)
     val currentVoiceoverEnabled by rememberUpdatedState(voiceoverEnabled)
@@ -120,7 +119,7 @@ fun OptionsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            // ✅ Chave Unit — o bloco NUNCA reinicia, o delay/onBack nunca é cancelado
+
             .pointerInput(Unit) {
                 fun vibrate(duration: Long) {
                     if (!currentVibrationEnabled) return
@@ -141,7 +140,7 @@ fun OptionsScreen(
                 }
 
                 coroutineScope {
-                    // Gesto de double tap — toggle da opção
+
                     launch {
                         detectTapGestures(
                             onDoubleTap = {
@@ -166,7 +165,6 @@ fun OptionsScreen(
                         )
                     }
 
-                    // Gesto de swipe com 1 dedo — mudar opção
                     launch {
                         detectHorizontalDragGestures(
                             onDragStart = {
@@ -184,7 +182,6 @@ fun OptionsScreen(
                         ) { change, dragAmount ->
                             if (change.pressed != true) return@detectHorizontalDragGestures
 
-                            // Bloqueia se estiver a voltar ou se for gesto de 2 dedos
                             if (isGoingBack || isTwoFingerGesture) {
                                 dragAmountTotal = 0f
                                 hasChangedOptionThisSwipe = false
@@ -212,7 +209,6 @@ fun OptionsScreen(
                         }
                     }
 
-                    // Gesto de 2 dedos — voltar ao menu
                     launch {
                         awaitPointerEventScope {
                             while (true) {
@@ -232,7 +228,6 @@ fun OptionsScreen(
                                         vibrate(60)
                                         speak("Going back to menu.", "options_go_back")
 
-                                        // ✅ currentOnBack é sempre o lambda mais recente — nunca fica stale
                                         launch {
                                             kotlinx.coroutines.delay(2000)
                                             currentOnBack()

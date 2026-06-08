@@ -108,7 +108,11 @@ fun WatchProgressScreen(
                                         vibrator.vibrate(400)
                                     }
 
-                                    askingToEnd = true // Entra no modo de confirmação
+                                    if (!paused) {
+                                        onPauseToggle()
+                                    }
+
+                                    askingToEnd = true
                                     onSpeakRequest("Finish session? Single tap for no, double tap for yes.")
                                 }
                             )

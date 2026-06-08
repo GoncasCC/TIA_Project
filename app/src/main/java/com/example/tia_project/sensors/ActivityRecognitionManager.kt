@@ -30,7 +30,7 @@ class ActivityRecognitionManager(
 
     private val pendingIntent: PendingIntent by lazy {
         val intent = Intent(ACTION_ACTIVITY_UPDATE).apply {
-            // THIS LINE FIXES THE ANDROID 14 CRASH
+
             setPackage(context.packageName)
         }
         PendingIntent.getBroadcast(

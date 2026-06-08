@@ -35,7 +35,7 @@ fun SessionSummaryScreen(
     val context = LocalContext.current
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val accentColor = Color(0xFF00C853) // Verde para sucesso
+    val accentColor = Color(0xFF00C853)
 
     val minutes = timeSeconds / 60
     val distanceStr = String.format(Locale.US, "%.2f", distanceKm)
@@ -101,40 +101,40 @@ fun SessionSummaryScreen(
             },
         contentAlignment = Alignment.Center
     ) {
+
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.SpaceEvenly,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "FINISHED!",
                 color = accentColor,
-                fontSize = 52.sp,
+                fontSize = 50.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(modifier = Modifier.height(40.dp))
 
             Text(
                 text = "$distanceStr KM",
                 color = textColor,
-                fontSize = 64.sp,
+                fontSize = 50.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "$minutes MIN",
                 color = textColor,
-                fontSize = 64.sp,
+                fontSize = 50.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(modifier = Modifier.height(60.dp))
         }
     }
 }
