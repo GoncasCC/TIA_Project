@@ -368,6 +368,7 @@ fun TrainingSession(
             "progress" to totalProgress,
             "level" to levelNumber,
             "paused" to isPaused,
+            "isStopped" to isStoppedByInactivity,
             "difficulty" to difficulty,
             "goalType" to goalType,
             "targetSteps" to estimateTargetSteps(targetDistanceMeters),

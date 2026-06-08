@@ -23,6 +23,8 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import org.json.JSONObject
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnMessageReceivedListener {
 
@@ -30,9 +32,20 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var stepCounterSensor: Sensor? = null
     private var initialSteps: Float? = null
 
+    // 1. A variável do TTS declarada corretamente aqui
+    private var tts: TextToSpeech? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 2. Inicialização do TextToSpeech (Unificado aqui)
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.US
+            }
+        }
+
+        // 3. Inicialização dos Sensores e Permissões
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
@@ -42,6 +55,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 1001)
         }
 
+        // 4. Bloco setContent do Compose
         setContent {
             val session by WearSessionRepository.session.collectAsState()
             val sessionActive by WearSessionRepository.sessionActive.collectAsState()
@@ -58,6 +72,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     progress = session.progress,
                     level = session.level,
                     paused = session.paused,
+                    isStopped = session.isStopped,
                     difficulty = session.difficulty,
                     onPauseToggle = {
                         val newPaused = !session.paused
@@ -67,10 +82,21 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     onEndSession = {
                         WearSessionRepository.setSessionActive(false)
                         sendWatchCommand("end_session")
+                    },
+                    onSpeakRequest = { text ->
+                        // O TTS sendo chamado quando a tela do Compose pedir
+                        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "end_confirm")
                     }
                 )
             }
         }
+    }
+
+    // 5. O onDestroy liberando a memória do TTS corretamente
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        super.onDestroy()
     }
 
     override fun onResume() {
@@ -111,6 +137,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         progress = json.optDouble("progress", current.progress.toDouble()).toFloat(),
                         level = json.optInt("level", current.level),
                         paused = json.optBoolean("paused", false),
+                        isStopped = json.optBoolean("isStopped", false),
                         difficulty = json.optString("difficulty", current.difficulty),
                         goalType = newGoalType,
                         targetSteps = json.optInt("targetSteps", 1).coerceAtLeast(1),
@@ -124,7 +151,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 }
             }
         } catch (e: Exception) {
-            // /session_start chega sem JSON
             when (path) {
                 "/session_start" -> {
                     WearSessionRepository.triggerStepReset()

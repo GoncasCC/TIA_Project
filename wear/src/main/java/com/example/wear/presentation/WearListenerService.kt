@@ -17,6 +17,7 @@ data class SessionData(
     val progress: Float = 0f,
     val level: Int = 1,
     val paused: Boolean = false,
+    val isStopped: Boolean = false,
     val difficulty: String = "JUST VIBING",
     val goalType: String = "DISTANCE",
     val targetSteps: Int = 1,
