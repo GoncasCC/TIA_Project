@@ -320,16 +320,16 @@ private fun GuideTrainingLayout(
         GuideStep.FINISHED -> "guide completed"
     }
     val currentCardColor = when (step) {
-        GuideStep.EASYMODE -> Color(0xFF00C853)
-        GuideStep.MEDIUMMODE -> Color(0xFFFFCC00)
-        GuideStep.HARDMODE -> Color(0xFFD50000)
+        GuideStep.EASYMODE -> Color(0xFF2196F3)
+        GuideStep.MEDIUMMODE -> Color(0xFFFF9800)
+        GuideStep.HARDMODE -> Color(0xFF9C27B0)
         else -> cardColor
     }
 
     val currentCardTextColor = when (step) {
         GuideStep.EASYMODE,
         GuideStep.MEDIUMMODE,
-        GuideStep.HARDMODE -> Color.Black
+        GuideStep.HARDMODE -> Color.White
         else -> cardTextColor
     }
 
