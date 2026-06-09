@@ -34,7 +34,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
 
-
     private var lastLevel = 1
     private var halfwayAnnounced = false
     private var levelEndAnnounced = false
@@ -49,6 +48,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -158,7 +158,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         vibrationEnabled        = json.optBoolean("vibrationEnabled", true),
                         voiceoverEnabled        = json.optBoolean("voiceoverEnabled", true),
                         personalBestDistanceKm  = json.optDouble("personalBestDistanceKm", 0.0).toFloat(),
-                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0)
+                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0),
+                        activity                = json.optString("activity", "RUNNING")
                     ))
                     WearSessionRepository.setSessionActive(true)
                     resetSessionState()
@@ -170,6 +171,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         "pause"  -> WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = true))
                         "resume" -> WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = false))
                     }
+                }
+                "/session_end" -> {
+                    stopCheckJob?.cancel()
+                    WearSessionRepository.setSessionActive(false)
                 }
             }
         } catch (e: Exception) {
@@ -212,11 +217,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             sendLevelChanged(level)
         }
 
-
         if (session.goalType == "DISTANCE" && session.difficulty != "JUST VIBING") {
             handleLevelFeedback(levelProgress, level, session)
         }
-
 
         if (session.difficulty == "PUSHING LIMITS") {
             handlePersonalBestFeedback(sessionSteps, session)
@@ -228,8 +231,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-
-
 
     private fun handleLevelFeedback(levelProgress: Float, level: Int, session: SessionData) {
         if (!halfwayAnnounced && levelProgress >= 0.5f) {
@@ -244,19 +245,15 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
-
-
     private fun handlePersonalBestFeedback(steps: Int, session: SessionData) {
         val pbDistanceMeters = session.personalBestDistanceKm * 1000f
         val currentDistanceMeters = steps * 0.78f
-
 
         if (!personalBestAnnounced && pbDistanceMeters > 0f && currentDistanceMeters > pbDistanceMeters) {
             personalBestAnnounced = true
             speak("New personal best! ${String.format(Locale.US, "%.2f", currentDistanceMeters / 1000f)} kilometers.")
             return
         }
-
 
         if (steps - lastMotivationStep < 128) return
         lastMotivationStep = steps
@@ -273,11 +270,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 speak("Keep going. Focus on finishing strong.")
             }
             else -> {
-                val targetSteps = session.targetSteps
-                val remainingSessionSteps = targetSteps - steps
+                val remainingSessionSteps = session.targetSteps - steps
                 if (remainingSessionSteps <= 0) return
-
-
                 if (remainingPbDistance <= remainingSessionSteps * 0.78f) {
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
@@ -287,37 +281,50 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
-
-
     private fun startStopCheckLoop() {
         stopCheckJob?.cancel()
         stopCheckJob = scope.launch {
+            var everStarted = false
+
+            // Dá tempo para a pessoa começar antes de qualquer verificação
+            delay(7000)
+
             while (isActive) {
-                delay(8000)
                 val session = WearSessionRepository.session.value
                 if (!WearSessionRepository.sessionActive.value) break
-                if (session.paused || session.difficulty == "JUST VIBING") continue
+                if (session.paused || session.difficulty == "JUST VIBING") {
+                    lastStepsForStopCheck = sessionSteps
+                    delay(3000)
+                    continue
+                }
 
                 val hasMoved = sessionSteps > lastStepsForStopCheck + 5
 
-                if (!hasMoved && !stopWarningSent) {
-                    stopWarningSent = true
-                    WearSessionRepository.update(session.copy(isStopped = true))
-                    vibrate("stop_warning")
-                    speak("You stopped. Let's keep going.")
-                }
-
                 if (hasMoved) {
+                    everStarted = true
                     stopWarningSent = false
                     WearSessionRepository.update(session.copy(isStopped = false))
+                } else if (!hasMoved && !stopWarningSent) {
+                    stopWarningSent = true
+                    if (everStarted) {
+                        WearSessionRepository.update(session.copy(isStopped = true))
+                        vibrate("stop_warning")
+                        speak("You stopped. Let's keep going.")
+                    } else {
+                        vibrate("nudge")
+                        val prompt = when (session.activity.uppercase()) {
+                            "WALK" -> "Let's start walking."
+                            else      -> "Let's start running."
+                        }
+                        speak(prompt)
+                    }
                 }
 
                 lastStepsForStopCheck = sessionSteps
+                delay(if (everStarted) 3000L else 7000L)
             }
         }
     }
-
-
 
     private fun onSessionComplete(session: SessionData) {
         stopCheckJob?.cancel()
@@ -327,14 +334,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
-
             (sessionSteps / 90f * 60f).toInt()
         }
         sendSessionResult(distanceMeters, elapsedSeconds, endedEarly = false)
         WearSessionRepository.setSessionActive(false)
     }
-
-
 
     private fun sendCommandToPhone(command: String) {
         val payload = """{"command":"$command"}""".toByteArray(Charsets.UTF_8)
@@ -363,7 +367,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             }
     }
 
-
     private fun speak(text: String) {
         if (isTtsReady && WearSessionRepository.session.value.voiceoverEnabled) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text.hashCode().toString())
@@ -373,9 +376,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private fun vibrate(type: String) {
         if (!WearSessionRepository.session.value.vibrationEnabled) return
         val pattern = when (type) {
+            "nudge"            -> longArrayOf(0, 80)
             "halfway"          -> longArrayOf(0, 120)
             "level_complete"   -> longArrayOf(0, 150, 100, 150)
-            "stop_warning"     -> longArrayOf(0, 500)
+            "stop_warning" -> longArrayOf(0, 400, 100, 400, 100, 400)
             "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
             else               -> longArrayOf(0, 100)
         }

@@ -34,6 +34,7 @@ object WatchDataRepository {
     private val _result = MutableStateFlow(WatchSessionResult())
     val result: StateFlow<WatchSessionResult> = _result.asStateFlow()
 
+    // Nível atual enviado pelo watch (para trocar música)
     private val _level = MutableStateFlow(0)
     val level: StateFlow<Int> = _level.asStateFlow()
 
@@ -47,6 +48,10 @@ object WatchDataRepository {
 
     fun updateResult(distanceMeters: Float, elapsedSeconds: Int, endedEarly: Boolean) {
         _result.value = WatchSessionResult(distanceMeters, elapsedSeconds, endedEarly, System.currentTimeMillis())
+    }
+
+    fun clearResult() {
+        _result.value = WatchSessionResult()
     }
 
     fun updateLevel(level: Int) {

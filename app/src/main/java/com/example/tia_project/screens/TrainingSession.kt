@@ -51,10 +51,13 @@ fun TrainingSession(
 
 
     LaunchedEffect(Unit) {
+        WatchDataRepository.clearResult()
+
         val personalBest = getPersonalBestSession(context)
         sendMessageToWatch(
             context, "/session_start", mapOf(
                 "goalType"                to goalType,
+                "activity"  to activity,
                 "goalValue"               to goalValue,
                 "difficulty"              to difficulty,
                 "targetSteps"             to estimateTargetSteps(targetDistanceMeters),
@@ -64,6 +67,7 @@ fun TrainingSession(
                 "personalBestTimeSeconds" to (personalBest?.timeSeconds ?: 0)
             )
         )
+
         delay(2500)
         isStarting = false
     }
@@ -87,12 +91,17 @@ fun TrainingSession(
         }
     }
 
+
     var lastHandledResultTimestamp by remember { mutableStateOf(0L) }
     LaunchedEffect(watchResult) {
         if (watchResult.timestamp <= lastHandledResultTimestamp) return@LaunchedEffect
+        if (isStarting) return@LaunchedEffect
         lastHandledResultTimestamp = watchResult.timestamp
 
         try { mediaPlayer?.pause() } catch (e: Exception) { }
+
+
+        sendMessageToWatch(context, "/session_end")
 
         saveTrainingSession(
             context       = context,
@@ -109,10 +118,12 @@ fun TrainingSession(
         onFinish(watchResult.distanceMeters / 1000f, watchResult.elapsedSeconds)
     }
 
+
     val watchLevel by WatchDataRepository.level.collectAsState()
     LaunchedEffect(watchLevel) {
         if (watchLevel > 0) musicLevel = watchLevel
     }
+
 
     val audioResId = when {
         !musicEnabled -> R.raw.footsteps
@@ -132,7 +143,7 @@ fun TrainingSession(
         mediaPlayer?.release()
         mediaPlayer = MediaPlayer.create(context, audioResId).apply {
             isLooping = true
-            if (!shouldStopSessionProgress) start()
+            if (!isPaused) start()
         }
     }
 
@@ -162,8 +173,6 @@ fun TrainingSession(
     ) { }
 }
 
-
-
 private fun saveTrainingSession(
     context: Context,
     activity: String,
@@ -192,7 +201,6 @@ private fun getPersonalBestSession(context: Context): SavedSession? {
         ) else null
     }.maxByOrNull { it.distanceKm }
 }
-
 
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
 

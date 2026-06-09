@@ -22,7 +22,8 @@ data class SessionData(
     val vibrationEnabled: Boolean = true,
     val voiceoverEnabled: Boolean = true,
     val personalBestDistanceKm: Float = 0f,
-    val personalBestTimeSeconds: Int = 0
+    val personalBestTimeSeconds: Int = 0,
+    val activity: String = "RUNNING"
 )
 
 object WearSessionRepository {
@@ -77,6 +78,9 @@ class WearListenerService : WearableListenerService() {
                             WearSessionRepository.session.value.copy(paused = false)
                         )
                     }
+                }
+                "/session_end" -> {
+                    WearSessionRepository.setSessionActive(false)
                 }
             }
         } catch (e: Exception) {

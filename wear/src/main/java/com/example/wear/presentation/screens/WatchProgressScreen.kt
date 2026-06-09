@@ -162,7 +162,11 @@ fun WatchProgressScreen(
                 )
             }
             Text(
-                text = if (localPaused || isStopped) "PAUSED" else "L$level",
+                text = when {
+                    isStopped  -> "STOPPED"
+                    localPaused -> "PAUSED"
+                    else        -> "L$level"
+                },
                 color = Color.White,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
