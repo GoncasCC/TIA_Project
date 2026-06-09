@@ -45,6 +45,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var stopCheckJob: Job? = null
+    private var timerJob: Job? = null
+    private var timerStartMs: Long = 0L
+    private var timerPausedMs: Long = 0L
+    private var timerElapsedBeforePause: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -164,16 +168,28 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     WearSessionRepository.setSessionActive(true)
                     resetSessionState()
                     startStopCheckLoop()
+                    if (newGoalType == "TIME") {
+                        startTimeGoalTimer(json.optString("goalValue", "1 MINUTE"))
+                    }
                 }
                 "/watch_command" -> {
                     val cmd = json.optString("command", "")
                     when (cmd) {
-                        "pause"  -> WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = true))
-                        "resume" -> WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = false))
+                        "pause"  -> {
+                            WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = true))
+
+                            timerElapsedBeforePause += System.currentTimeMillis() - timerStartMs
+                        }
+                        "resume" -> {
+                            WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = false))
+
+                            timerStartMs = System.currentTimeMillis()
+                        }
                     }
                 }
                 "/session_end" -> {
                     stopCheckJob?.cancel()
+                    timerJob?.cancel()
                     WearSessionRepository.setSessionActive(false)
                 }
             }
@@ -286,7 +302,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopCheckJob = scope.launch {
             var everStarted = false
 
-            // Dá tempo para a pessoa começar antes de qualquer verificação
+
             delay(7000)
 
             while (isActive) {
@@ -407,6 +423,56 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         lastMotivationStep = 0
         sessionSteps = 0
         initialSteps = null
+        timerJob?.cancel()
+        timerJob = null
+        timerStartMs = 0L
+        timerPausedMs = 0L
+        timerElapsedBeforePause = 0L
+    }
+
+    private fun startTimeGoalTimer(goalValue: String) {
+        timerJob?.cancel()
+        timerStartMs = System.currentTimeMillis()
+        timerPausedMs = 0L
+        timerElapsedBeforePause = 0L
+
+        val totalMinutes = goalValue.substringBefore(" ").toIntOrNull() ?: 1
+        val totalSeconds = totalMinutes * 60L
+        val totalLevels = totalMinutes.coerceAtLeast(1).toLong()
+        val secondsPerLevel = totalSeconds / totalLevels
+
+        timerJob = scope.launch {
+            while (isActive && WearSessionRepository.sessionActive.value) {
+                val session = WearSessionRepository.session.value
+
+                if (session.paused) {
+                    delay(200L)
+                    continue
+                }
+
+                val elapsedMs = timerElapsedBeforePause + (System.currentTimeMillis() - timerStartMs)
+                val elapsedSeconds = (elapsedMs / 1000L).coerceAtMost(totalSeconds)
+                val progress = (elapsedSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
+                val level = ((elapsedSeconds / secondsPerLevel) + 1)
+                    .coerceIn(1, totalLevels).toInt()
+
+                WearSessionRepository.update(session.copy(progress = progress, level = level))
+
+                if (level != lastLevel) {
+                    lastLevel = level
+                    halfwayAnnounced = false
+                    levelEndAnnounced = false
+                    sendLevelChanged(level)
+                }
+
+                if (progress >= 1f) {
+                    onSessionComplete(session)
+                    break
+                }
+
+                delay(1000L)
+            }
+        }
     }
 }
 

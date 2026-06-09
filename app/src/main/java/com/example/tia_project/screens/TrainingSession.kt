@@ -120,22 +120,33 @@ fun TrainingSession(
 
 
     val watchLevel by WatchDataRepository.level.collectAsState()
-    LaunchedEffect(watchLevel) {
-        if (watchLevel > 0) musicLevel = watchLevel
-    }
+    val watchProgress by WatchDataRepository.progress.collectAsState()
+    val totalLevels = remember(goalValue) { goalValue.extractNumber().coerceAtLeast(1) }
 
+    LaunchedEffect(watchLevel, watchProgress.progress) {
+        val level = if (watchLevel > 0) {
+
+            watchLevel.coerceIn(1, totalLevels)
+        } else if (isDistanceGoal) {
+            1
+        } else {
+
+            val p = watchProgress.progress.coerceIn(0f, 1f)
+            ((p * totalLevels).toInt() + 1).coerceIn(1, totalLevels)
+        }
+        musicLevel = level
+    }
 
     val audioResId = when {
         !musicEnabled -> R.raw.footsteps
         isJustVibing  -> R.raw.relaxing_music
-        isStartingToSweat || isPushingLimits -> when (musicLevel) {
+        else -> when (musicLevel) {
             1    -> R.raw.song1
             2    -> R.raw.song2
             3    -> R.raw.song3
             4    -> R.raw.song4
             else -> R.raw.song5
         }
-        else -> R.raw.footsteps
     }
 
     LaunchedEffect(audioResId) {
@@ -143,18 +154,17 @@ fun TrainingSession(
         mediaPlayer?.release()
         mediaPlayer = MediaPlayer.create(context, audioResId).apply {
             isLooping = true
-            if (!isPaused) start()
+            if (!shouldStopSessionProgress) start()
         }
     }
 
     LaunchedEffect(shouldStopSessionProgress) {
         try {
-            mediaPlayer?.let { player ->
-                if (shouldStopSessionProgress && player.isPlaying) {
-                    player.pause()
-                } else if (!shouldStopSessionProgress && !player.isPlaying) {
-                    player.start()
-                }
+            val player = mediaPlayer ?: return@LaunchedEffect
+            if (shouldStopSessionProgress) {
+                if (player.isPlaying) player.pause()
+            } else {
+                if (!player.isPlaying) player.start()
             }
         } catch (e: Exception) { }
     }
