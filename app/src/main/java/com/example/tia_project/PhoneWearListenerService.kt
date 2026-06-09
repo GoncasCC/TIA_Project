@@ -1,7 +1,5 @@
 package com.example.tia_project
 
-import com.google.android.gms.wearable.DataEvent
-import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONObject
@@ -10,46 +8,26 @@ class PhoneWearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         val path = messageEvent.path
-        if (path == "/watch_command") {
-            try {
-                val jsonString = String(messageEvent.data, Charsets.UTF_8)
-                val json = JSONObject(jsonString)
-                val command = json.getString("command")
-
-                val cleanCommand = command.replace("\"", "").trim()
-                WatchDataRepository.updateCommand(cleanCommand, System.currentTimeMillis())
-            } catch (e: Exception) {
-
-                val raw = String(messageEvent.data, Charsets.UTF_8)
-                val cleanCommand = raw.replace("\"", "").trim()
-                WatchDataRepository.updateCommand(cleanCommand, System.currentTimeMillis())
-            }
-        }
-    }
-
-    override fun onDataChanged(dataEvents: com.google.android.gms.wearable.DataEventBuffer) {
-        dataEvents.forEach { event ->
-            if (event.type == DataEvent.TYPE_CHANGED) {
-                val path = event.dataItem.uri.path
-                val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
-
-                when (path) {
-                    "/watch_progress" -> {
-                        val progress = dataMap.getFloat("progress")
-                        val level = dataMap.getInt("level")
-                        val paused = dataMap.getBoolean("paused")
-                        val difficulty = dataMap.getString("difficulty") ?: ""
-                        val steps = dataMap.getInt("steps", 0)
-                        WatchDataRepository.updateProgress(progress, level, paused, difficulty, steps)
-                    }
-                    "/watch_command" -> {
-                        val command = dataMap.getString("command") ?: return@forEach
-                        val cleanCommand = command.replace("\"", "").trim()
-                        val timestamp = dataMap.getLong("timestamp", System.currentTimeMillis())
-                        WatchDataRepository.updateCommand(cleanCommand, timestamp)
-                    }
+        try {
+            val json = JSONObject(String(messageEvent.data, Charsets.UTF_8))
+            when (path) {
+                "/watch_command" -> {
+                    val command = json.getString("command").replace("\"", "").trim()
+                    WatchDataRepository.updateCommand(command, System.currentTimeMillis())
+                }
+                "/level_changed" -> {
+                    val level = json.optInt("level", 1)
+                    WatchDataRepository.updateLevel(level)
+                }
+                "/session_result" -> {
+                    val distanceMeters  = json.optDouble("distanceMeters", 0.0).toFloat()
+                    val elapsedSeconds  = json.optInt("elapsedSeconds", 0)
+                    val endedEarly      = json.optBoolean("endedEarly", false)
+                    WatchDataRepository.updateResult(distanceMeters, elapsedSeconds, endedEarly)
                 }
             }
+        } catch (e: Exception) {
+            android.util.Log.e("WearDebug", "Erro no PhoneWearListenerService ($path): ${e.message}")
         }
     }
 }

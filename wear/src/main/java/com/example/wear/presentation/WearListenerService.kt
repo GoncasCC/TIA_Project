@@ -4,11 +4,8 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import com.google.android.gms.wearable.DataClient
-import com.google.android.gms.wearable.DataEvent
-import com.google.android.gms.wearable.DataEventBuffer
-import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.WearableListenerService
+import com.google.android.gms.wearable.MessageEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,8 +17,12 @@ data class SessionData(
     val isStopped: Boolean = false,
     val difficulty: String = "JUST VIBING",
     val goalType: String = "DISTANCE",
+    val goalValue: String = "5 KILOMETERS",
     val targetSteps: Int = 1,
-    val vibrationEnabled: Boolean = true
+    val vibrationEnabled: Boolean = true,
+    val voiceoverEnabled: Boolean = true,
+    val personalBestDistanceKm: Float = 0f,
+    val personalBestTimeSeconds: Int = 0
 )
 
 object WearSessionRepository {
@@ -41,47 +42,48 @@ object WearSessionRepository {
 
 class WearListenerService : WearableListenerService() {
 
-    override fun onDataChanged(dataEvents: DataEventBuffer) {
-        android.util.Log.d("WearDebug", "onDataChanged chamado com ${dataEvents.count} eventos")
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        val path = messageEvent.path
+        android.util.Log.d("WearDebug", "✓ Mensagem recebida no serviço: $path")
 
-        dataEvents.forEach { event ->
-            android.util.Log.d("WearDebug", "evento: type=${event.type} path=${event.dataItem.uri.path}")
-
-            if (event.type != DataEvent.TYPE_CHANGED) return@forEach
-            val path = event.dataItem.uri.path
-            val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
+        try {
+            val json = org.json.JSONObject(String(messageEvent.data, Charsets.UTF_8))
 
             when (path) {
                 "/session_start" -> {
-                    android.util.Log.d("WearDebug", "✓ /session_start recebido no relógio")
-                    WearSessionRepository.triggerStepReset()
-                    WearSessionRepository.setSessionActive(true)
-                }
-                "/session_progress" -> {
-                    android.util.Log.d("WearDebug", "✓ /session_progress recebido no relógio")
-                    WearSessionRepository.setSessionActive(true)
+                    val newGoalType = json.optString("goalType", "DISTANCE")
                     val current = WearSessionRepository.session.value
-                    val newGoalType = dataMap.getString("goalType") ?: "DISTANCE"
-                    if (newGoalType != current.goalType) {
-                        WearSessionRepository.triggerStepReset()
-                    }
-                    WearSessionRepository.update(
-                        SessionData(
-                            progress = dataMap.getFloat("progress", current.progress),
-                            level = dataMap.getInt("level", current.level),
-                            paused = dataMap.getBoolean("paused"),
-                            difficulty = dataMap.getString("difficulty") ?: current.difficulty,
-                            goalType = newGoalType,
-                            targetSteps = dataMap.getInt("targetSteps", 1).coerceAtLeast(1),
-                            vibrationEnabled = dataMap.getBoolean("vibrationEnabled", true)
+                    if (newGoalType != current.goalType) WearSessionRepository.triggerStepReset()
+                    WearSessionRepository.triggerStepReset()
+                    WearSessionRepository.update(SessionData(
+                        goalType = newGoalType,
+                        goalValue = json.optString("goalValue", "5 KILOMETERS"),
+                        difficulty = json.optString("difficulty", "JUST VIBING"),
+                        targetSteps = json.optInt("targetSteps", 1).coerceAtLeast(1),
+                        vibrationEnabled = json.optBoolean("vibrationEnabled", true),
+                        voiceoverEnabled = json.optBoolean("voiceoverEnabled", true),
+                        personalBestDistanceKm = json.optDouble("personalBestDistanceKm", 0.0).toFloat(),
+                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0)
+                    ))
+                    WearSessionRepository.setSessionActive(true)
+                }
+                "/watch_command" -> {
+                    val cmd = json.optString("command", "")
+                    when (cmd) {
+                        "pause" -> WearSessionRepository.update(
+                            WearSessionRepository.session.value.copy(paused = true)
                         )
-                    )
+                        "resume" -> WearSessionRepository.update(
+                            WearSessionRepository.session.value.copy(paused = false)
+                        )
+                    }
                 }
-                "/watch_vibration" -> {
-                    val type = dataMap.getString("type") ?: return@forEach
-                    val enabled = WearSessionRepository.session.value.vibrationEnabled
-                    if (enabled) vibrateForEvent(type)
-                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("WearDebug", "Erro ao processar mensagem: ${e.message}")
+            if (path == "/session_start") {
+                WearSessionRepository.triggerStepReset()
+                WearSessionRepository.setSessionActive(true)
             }
         }
     }
@@ -94,14 +96,12 @@ class WearListenerService : WearableListenerService() {
             "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
             else               -> longArrayOf(0, 100)
         }
-
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
         } else {
             @Suppress("DEPRECATION")
             getSystemService(VIBRATOR_SERVICE) as Vibrator
         }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
         } else {
