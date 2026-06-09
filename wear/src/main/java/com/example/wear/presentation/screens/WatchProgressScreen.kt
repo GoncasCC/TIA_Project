@@ -33,6 +33,7 @@ fun WatchProgressScreen(
     paused: Boolean = false,
     isStopped: Boolean = false,
     difficulty: String = "JUST VIBING",
+    vibrationEnabled: Boolean = true, // <--- ADICIONADO AQUI
     onPauseToggle: () -> Unit = {},
     onResume: () -> Unit = {},
     onEndSession: () -> Unit = {},
@@ -40,7 +41,6 @@ fun WatchProgressScreen(
 ) {
     var askingToEnd by remember { mutableStateOf(false) }
     var wasPausedBeforeAsking by remember { mutableStateOf(false) }
-
 
     var localPaused by remember { mutableStateOf(paused) }
     LaunchedEffect(paused) { localPaused = paused }
@@ -66,14 +66,13 @@ fun WatchProgressScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(askingToEnd) {
+            .pointerInput(askingToEnd, vibrationEnabled) { // <--- vibrationEnabled adicionado aos "keys" do pointerInput
 
                 coroutineScope {
                     if (askingToEnd) {
                         launch {
                             detectTapGestures(
                                 onTap = {
-
                                     askingToEnd = false
                                     if (!wasPausedBeforeAsking) {
                                         localPaused = false
@@ -81,11 +80,13 @@ fun WatchProgressScreen(
                                     }
                                 },
                                 onDoubleTap = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        vibrator.vibrate(500)
+                                    if (vibrationEnabled) { // <--- VERIFICAÇÃO ADICIONADA
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            vibrator.vibrate(500)
+                                        }
                                     }
 
                                     onEndSession()
@@ -103,21 +104,25 @@ fun WatchProgressScreen(
                         launch {
                             detectTapGestures(
                                 onDoubleTap = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        vibrator.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        vibrator.vibrate(150)
+                                    if (vibrationEnabled) { // <--- VERIFICAÇÃO ADICIONADA
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            vibrator.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            vibrator.vibrate(150)
+                                        }
                                     }
                                     localPaused = !localPaused
                                     onPauseToggle()
                                 },
                                 onLongPress = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        vibrator.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        vibrator.vibrate(400)
+                                    if (vibrationEnabled) { // <--- VERIFICAÇÃO ADICIONADA
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            vibrator.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            vibrator.vibrate(400)
+                                        }
                                     }
 
                                     wasPausedBeforeAsking = localPaused

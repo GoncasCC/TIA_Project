@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     paused = session.paused,
                     isStopped = session.isStopped,
                     difficulty = session.difficulty,
+                    vibrationEnabled = session.vibrationEnabled,
                     onPauseToggle = {
                         val newPaused = !session.paused
                         WearSessionRepository.update(session.copy(paused = newPaused))
