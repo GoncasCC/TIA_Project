@@ -177,12 +177,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     when (cmd) {
                         "pause"  -> {
                             WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = true))
-
+                            // Accumulate elapsed time before pausing
                             timerElapsedBeforePause += System.currentTimeMillis() - timerStartMs
                         }
                         "resume" -> {
                             WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = false))
-
+                            // Reset start reference so elapsed calculation is correct
                             timerStartMs = System.currentTimeMillis()
                         }
                     }
@@ -302,7 +302,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopCheckJob = scope.launch {
             var everStarted = false
 
-
+            // Dá tempo para a pessoa começar antes de qualquer verificação
             delay(7000)
 
             while (isActive) {

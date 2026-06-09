@@ -47,17 +47,14 @@ fun TrainingSession(
     val isStartingToSweat = difficulty == "STARTING TO SWEAT"
     val isPushingLimits = difficulty == "PUSHING LIMITS"
 
-    val shouldStopSessionProgress = isPaused || isStarting
-
-
     LaunchedEffect(Unit) {
-        WatchDataRepository.clearResult()
+        WatchDataRepository.clearSessionState()
 
         val personalBest = getPersonalBestSession(context)
         sendMessageToWatch(
             context, "/session_start", mapOf(
                 "goalType"                to goalType,
-                "activity"  to activity,
+                "activity"                to activity,
                 "goalValue"               to goalValue,
                 "difficulty"              to difficulty,
                 "targetSteps"             to estimateTargetSteps(targetDistanceMeters),
@@ -72,8 +69,7 @@ fun TrainingSession(
         isStarting = false
     }
 
-
-    var lastHandledCommandTimestamp by remember { mutableStateOf(0L) }
+    var lastHandledCommandTimestamp by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(watchCommand) {
         if (watchCommand.timestamp <= lastHandledCommandTimestamp) return@LaunchedEffect
         lastHandledCommandTimestamp = watchCommand.timestamp
@@ -82,24 +78,18 @@ fun TrainingSession(
         when (cmd) {
             "pause" -> {
                 isPaused = true
-                try { mediaPlayer?.pause() } catch (e: Exception) { }
             }
             "resume" -> {
                 isPaused = false
-                try { mediaPlayer?.start() } catch (e: Exception) { }
             }
         }
     }
 
-
-    var lastHandledResultTimestamp by remember { mutableStateOf(0L) }
+    var lastHandledResultTimestamp by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(watchResult) {
         if (watchResult.timestamp <= lastHandledResultTimestamp) return@LaunchedEffect
         if (isStarting) return@LaunchedEffect
         lastHandledResultTimestamp = watchResult.timestamp
-
-        try { mediaPlayer?.pause() } catch (e: Exception) { }
-
 
         sendMessageToWatch(context, "/session_end")
 
@@ -118,19 +108,14 @@ fun TrainingSession(
         onFinish(watchResult.distanceMeters / 1000f, watchResult.elapsedSeconds)
     }
 
-
     val watchLevel by WatchDataRepository.level.collectAsState()
     val watchProgress by WatchDataRepository.progress.collectAsState()
     val totalLevels = remember(goalValue) { goalValue.extractNumber().coerceAtLeast(1) }
 
     LaunchedEffect(watchLevel, watchProgress.progress) {
-        val level = if (watchLevel > 0) {
-
-            watchLevel.coerceIn(1, totalLevels)
-        } else if (isDistanceGoal) {
-            1
+        val level = if (isDistanceGoal) {
+            if (watchLevel > 0) watchLevel else 1
         } else {
-
             val p = watchProgress.progress.coerceIn(0f, 1f)
             ((p * totalLevels).toInt() + 1).coerceIn(1, totalLevels)
         }
@@ -149,30 +134,41 @@ fun TrainingSession(
         }
     }
 
-    LaunchedEffect(audioResId) {
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = MediaPlayer.create(context, audioResId).apply {
+    val shouldPlay = !isStarting && !isPaused
+
+    DisposableEffect(audioResId) {
+        val player = MediaPlayer.create(context, audioResId).apply {
             isLooping = true
-            if (!shouldStopSessionProgress) start()
+        }
+        mediaPlayer = player
+
+        if (shouldPlay) {
+            try { player.start() } catch (e: Exception) {}
+        }
+
+        onDispose {
+            try {
+                player.stop()
+                player.release()
+            } catch (e: Exception) {}
+            mediaPlayer = null
         }
     }
 
-    LaunchedEffect(shouldStopSessionProgress) {
+    LaunchedEffect(shouldPlay) {
         try {
-            val player = mediaPlayer ?: return@LaunchedEffect
-            if (shouldStopSessionProgress) {
-                if (player.isPlaying) player.pause()
-            } else {
-                if (!player.isPlaying) player.start()
+            mediaPlayer?.let { player ->
+                if (shouldPlay && !player.isPlaying) {
+                    player.start()
+                } else if (!shouldPlay && player.isPlaying) {
+                    player.pause()
+                }
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {}
     }
-
     DisposableEffect(Unit) {
         onDispose {
-            try { mediaPlayer?.stop(); mediaPlayer?.release() } catch (e: Exception) { }
-            mediaPlayer = null
+            WatchDataRepository.clearSessionState()
         }
     }
 

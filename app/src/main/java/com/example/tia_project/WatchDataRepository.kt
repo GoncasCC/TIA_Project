@@ -50,7 +50,10 @@ object WatchDataRepository {
         _result.value = WatchSessionResult(distanceMeters, elapsedSeconds, endedEarly, System.currentTimeMillis())
     }
 
-    fun clearResult() {
+    fun clearSessionState() {
+        _command.value = WatchCommand()
+        _progress.value = WatchProgress()
+        _level.value = 0
         _result.value = WatchSessionResult()
     }
 
