@@ -100,7 +100,7 @@ fun GoalValueScreen(
     val options = if (goalType == "TIME") {
         listOf("1 MINUTE", "5 MINUTES")
     } else {
-        listOf("1 KILOMETER", "5 KILOMETERS")
+        listOf("1 KILOMETER")
     }
 
     OptionSelectionScreen(

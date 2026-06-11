@@ -17,7 +17,7 @@ data class SessionData(
     val isStopped: Boolean = false,
     val difficulty: String = "JUST VIBING",
     val goalType: String = "DISTANCE",
-    val goalValue: String = "5 KILOMETERS",
+    val goalValue: String = "1 KILOMETER",
     val targetSteps: Int = 1,
     val vibrationEnabled: Boolean = true,
     val voiceoverEnabled: Boolean = true,

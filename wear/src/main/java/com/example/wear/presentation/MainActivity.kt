@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     WearSessionRepository.triggerStepReset()
                     WearSessionRepository.update(SessionData(
                         goalType                = newGoalType,
-                        goalValue               = json.optString("goalValue", "5 KILOMETERS"),
+                        goalValue               = json.optString("goalValue", "1 KILOMETER"),
                         difficulty              = json.optString("difficulty", "JUST VIBING"),
                         targetSteps             = json.optInt("targetSteps", 1).coerceAtLeast(1),
                         vibrationEnabled        = json.optBoolean("vibrationEnabled", true),
