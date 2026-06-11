@@ -50,6 +50,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var timerPausedMs: Long = 0L
     private var timerElapsedBeforePause: Long = 0L
 
+    // Real-world elapsed time tracking (used for DISTANCE goals)
+    private var sessionStartMs: Long = 0L
+    private var sessionPausedAccumulatedMs: Long = 0L
+    private var sessionPauseStartMs: Long = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -98,7 +103,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     paused = session.paused,
                     isStopped = session.isStopped,
                     difficulty = session.difficulty,
-                    vibrationEnabled = session.vibrationEnabled,
                     onPauseToggle = {
                         val newPaused = !session.paused
                         WearSessionRepository.update(session.copy(paused = newPaused))
@@ -111,9 +115,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     onEndSession = {
                         sendSessionResult(
                             distanceMeters = sessionSteps * 0.78f,
-                            elapsedSeconds = session.progress.let { p ->
+                            elapsedSeconds = if (WearSessionRepository.session.value.goalType == "TIME") {
+                                val p = session.progress
                                 val targetSecs = session.goalValue.extractNumber() * 60
                                 (p * targetSecs).toInt()
+                            } else {
+                                realElapsedSeconds()
                             },
                             endedEarly = true
                         )
@@ -168,6 +175,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     ))
                     WearSessionRepository.setSessionActive(true)
                     resetSessionState()
+                    sessionStartMs = System.currentTimeMillis()
+                    sessionPausedAccumulatedMs = 0L
+                    sessionPauseStartMs = 0L
                     startStopCheckLoop()
                     if (newGoalType == "TIME") {
                         startTimeGoalTimer(json.optString("goalValue", "1 MINUTE"))
@@ -178,13 +188,16 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     when (cmd) {
                         "pause"  -> {
                             WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = true))
-                            // Accumulate elapsed time before pausing
                             timerElapsedBeforePause += System.currentTimeMillis() - timerStartMs
+                            sessionPauseStartMs = System.currentTimeMillis()
                         }
                         "resume" -> {
                             WearSessionRepository.update(WearSessionRepository.session.value.copy(paused = false))
-                            // Reset start reference so elapsed calculation is correct
                             timerStartMs = System.currentTimeMillis()
+                            if (sessionPauseStartMs > 0L) {
+                                sessionPausedAccumulatedMs += System.currentTimeMillis() - sessionPauseStartMs
+                                sessionPauseStartMs = 0L
+                            }
                         }
                     }
                 }
@@ -343,6 +356,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
+    private fun realElapsedSeconds(): Int {
+        val pausedNow = if (sessionPauseStartMs > 0L)
+            System.currentTimeMillis() - sessionPauseStartMs else 0L
+        val activeMs = (System.currentTimeMillis() - sessionStartMs) -
+                sessionPausedAccumulatedMs - pausedNow
+        return (activeMs / 1000L).coerceAtLeast(0L).toInt()
+    }
+
     private fun onSessionComplete(session: SessionData) {
         stopCheckJob?.cancel()
         vibrate("session_complete")
@@ -351,7 +372,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
-            (sessionSteps / 90f * 60f).toInt()
+            realElapsedSeconds()
         }
         sendSessionResult(distanceMeters, elapsedSeconds, endedEarly = false)
         WearSessionRepository.setSessionActive(false)
@@ -429,6 +450,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         timerStartMs = 0L
         timerPausedMs = 0L
         timerElapsedBeforePause = 0L
+        sessionStartMs = 0L
+        sessionPausedAccumulatedMs = 0L
+        sessionPauseStartMs = 0L
     }
 
     private fun startTimeGoalTimer(goalValue: String) {
@@ -466,6 +490,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     sendLevelChanged(level)
                 }
 
+                if (session.difficulty != "JUST VIBING") {
+                    val secondsIntoLevel = elapsedSeconds % secondsPerLevel
+                    val levelProgress = (secondsIntoLevel.toFloat() / secondsPerLevel).coerceIn(0f, 1f)
+                    handleLevelFeedback(levelProgress, level, session)
+                }
+
                 if (progress >= 1f) {
                     onSessionComplete(session)
                     break
@@ -476,5 +506,3 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 }
-
-private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1

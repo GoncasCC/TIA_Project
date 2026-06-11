@@ -114,3 +114,4 @@ class WearListenerService : WearableListenerService() {
         }
     }
 }
+internal fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1

@@ -113,13 +113,7 @@ fun TrainingSession(
     val totalLevels = remember(goalValue) { goalValue.extractNumber().coerceAtLeast(1) }
 
     LaunchedEffect(watchLevel, watchProgress.progress) {
-        val level = if (isDistanceGoal) {
-            if (watchLevel > 0) watchLevel else 1
-        } else {
-            val p = watchProgress.progress.coerceIn(0f, 1f)
-            ((p * totalLevels).toInt() + 1).coerceIn(1, totalLevels)
-        }
-        musicLevel = level
+        if (watchLevel > 0) musicLevel = watchLevel
     }
 
     val audioResId = when {
