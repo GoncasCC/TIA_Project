@@ -34,6 +34,9 @@ fun TrainingSession(
     val targetDistanceMeters = remember(goalValue) { goalValue.extractNumber() * 1000f }
     val targetTimeSeconds = remember(goalValue) { goalValue.extractNumber() * 60 }
 
+    // Modo "1 minuto": deve tocar sempre a música 5
+    val isOneMinuteMode = goalType == "TIME" && goalValue.extractNumber() == 1
+
     var isPaused by remember { mutableStateOf(false) }
     var isStarting by remember { mutableStateOf(true) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -119,6 +122,7 @@ fun TrainingSession(
     val audioResId = when {
         !musicEnabled -> R.raw.footsteps
         isJustVibing  -> R.raw.relaxing_music
+        isOneMinuteMode -> R.raw.song5
         else -> when (musicLevel) {
             1    -> R.raw.song1
             2    -> R.raw.song2

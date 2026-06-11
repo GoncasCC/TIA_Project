@@ -228,7 +228,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
         if (session.goalType == "DISTANCE") {
             progress = (sessionSteps.toFloat() / session.targetSteps).coerceIn(0f, 1f)
-            val totalLevels = session.goalValue.extractNumber().coerceAtLeast(1)
+            // Um checkpoint (nível) a cada 200 metros -> 1 km dá 5 níveis
+            val targetDistanceMeters = session.goalValue.extractNumber() * 1000
+            val metersPerCheckpoint = 200
+            val totalLevels = (targetDistanceMeters / metersPerCheckpoint).coerceAtLeast(1)
             val stepsPerLevel = session.targetSteps / totalLevels
             level = if (stepsPerLevel > 0) (sessionSteps / stepsPerLevel + 1).coerceIn(1, totalLevels) else 1
             levelProgress = if (stepsPerLevel > 0) ((sessionSteps % stepsPerLevel).toFloat() / stepsPerLevel).coerceIn(0f, 1f) else 0f
