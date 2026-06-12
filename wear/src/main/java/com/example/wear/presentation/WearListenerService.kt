@@ -64,7 +64,8 @@ class WearListenerService : WearableListenerService() {
                         vibrationEnabled = json.optBoolean("vibrationEnabled", true),
                         voiceoverEnabled = json.optBoolean("voiceoverEnabled", true),
                         personalBestDistanceKm = json.optDouble("personalBestDistanceKm", 0.0).toFloat(),
-                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0)
+                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0),
+                        activity = json.optString("activity", "RUNNING")
                     ))
                     WearSessionRepository.setSessionActive(true)
                 }

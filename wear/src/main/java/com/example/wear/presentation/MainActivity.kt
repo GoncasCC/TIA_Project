@@ -50,7 +50,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var timerPausedMs: Long = 0L
     private var timerElapsedBeforePause: Long = 0L
 
-    // Real-world elapsed time tracking (used for DISTANCE goals)
     private var sessionStartMs: Long = 0L
     private var sessionPausedAccumulatedMs: Long = 0L
     private var sessionPauseStartMs: Long = 0L
@@ -143,7 +142,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         super.onResume()
         Wearable.getMessageClient(this).addListener(this)
         stepCounterSensor?.also { sensor ->
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_FASTEST)
         }
     }
 
@@ -228,7 +227,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
         if (session.goalType == "DISTANCE") {
             progress = (sessionSteps.toFloat() / session.targetSteps).coerceIn(0f, 1f)
-            // Um checkpoint (nível) a cada 200 metros -> 1 km dá 5 níveis
+
             val targetDistanceMeters = session.goalValue.extractNumber() * 1000
             val metersPerCheckpoint = 200
             val totalLevels = (targetDistanceMeters / metersPerCheckpoint).coerceAtLeast(1)
@@ -316,30 +315,49 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private fun startStopCheckLoop() {
         stopCheckJob?.cancel()
+
         stopCheckJob = scope.launch {
             var everStarted = false
 
-            // Dá tempo para a pessoa começar antes de qualquer verificação
-            delay(7000)
+            val sessionActivity = WearSessionRepository.session.value.activity.uppercase()
+
+            val startDelay = if (sessionActivity == "WALK") 15_000L else 10_000L
+            delay(startDelay)
 
             while (isActive) {
+                if (!WearSessionRepository.sessionActive.value) {
+                    break
+                }
+
                 val session = WearSessionRepository.session.value
-                if (!WearSessionRepository.sessionActive.value) break
+
                 if (session.paused || session.difficulty == "JUST VIBING") {
                     lastStepsForStopCheck = sessionSteps
                     delay(3000)
                     continue
                 }
 
-                val hasMoved = sessionSteps > lastStepsForStopCheck + 5
+                val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
+                val hasMoved = sessionSteps > lastStepsForStopCheck + stepThreshold
 
                 if (hasMoved) {
                     everStarted = true
                     stopWarningSent = false
-                    WearSessionRepository.update(session.copy(isStopped = false))
+
+                    if (session.isStopped) {
+                        WearSessionRepository.update(session.copy(isStopped = false))
+                    }
+
+                    lastStepsForStopCheck = sessionSteps
+
                 } else if (!hasMoved && !stopWarningSent) {
                     stopWarningSent = true
+
                     if (everStarted) {
+                        if (!WearSessionRepository.sessionActive.value) {
+                            break
+                        }
+
                         WearSessionRepository.update(session.copy(isStopped = true))
                         vibrate("stop_warning")
                         speak("You stopped. Let's keep going.")
@@ -347,14 +365,23 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         vibrate("nudge")
                         val prompt = when (session.activity.uppercase()) {
                             "WALK" -> "Let's start walking."
-                            else      -> "Let's start running."
+                            else -> "Let's start running."
                         }
                         speak(prompt)
                     }
+
+                    lastStepsForStopCheck = sessionSteps
                 }
 
-                lastStepsForStopCheck = sessionSteps
-                delay(if (everStarted) 3000L else 7000L)
+                val checkInterval = if (session.isStopped) {
+                    1_000L
+                } else if (session.activity.uppercase() == "WALK") {
+                    6_000L
+                } else {
+                    3_000L
+                }
+
+                delay(if (everStarted) checkInterval else 7_000L)
             }
         }
     }
@@ -369,15 +396,32 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private fun onSessionComplete(session: SessionData) {
         stopCheckJob?.cancel()
+        timerJob?.cancel()
+
+        WearSessionRepository.update(
+            session.copy(
+                isStopped = false,
+                paused = false
+            )
+        )
+
         vibrate("session_complete")
         speak("Workout complete.")
+
         val distanceMeters = sessionSteps * 0.78f
+
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
             realElapsedSeconds()
         }
-        sendSessionResult(distanceMeters, elapsedSeconds, endedEarly = false)
+
+        sendSessionResult(
+            distanceMeters = distanceMeters,
+            elapsedSeconds = elapsedSeconds,
+            endedEarly = false
+        )
+
         WearSessionRepository.setSessionActive(false)
     }
 
@@ -420,7 +464,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             "nudge"            -> longArrayOf(0, 80)
             "halfway"          -> longArrayOf(0, 120)
             "level_complete"   -> longArrayOf(0, 150, 100, 150)
-            "stop_warning" -> longArrayOf(0, 400, 100, 400, 100, 400)
+            "stop_warning"     -> longArrayOf(0, 400, 100, 400, 100, 400)
             "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
             else               -> longArrayOf(0, 100)
         }
@@ -439,6 +483,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     }
 
     private fun resetSessionState() {
+        WearSessionRepository.update(
+            WearSessionRepository.session.value.copy(
+                isStopped = false,
+                paused = false
+            )
+        )
         lastLevel = 1
         halfwayAnnounced = false
         levelEndAnnounced = false
