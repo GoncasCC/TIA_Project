@@ -23,7 +23,8 @@ data class SessionData(
     val voiceoverEnabled: Boolean = true,
     val personalBestDistanceKm: Float = 0f,
     val personalBestTimeSeconds: Int = 0,
-    val activity: String = "RUNNING"
+    val activity: String = "RUNNING",
+    val needsSpeedUp: Boolean = false
 )
 
 object WearSessionRepository {
@@ -64,8 +65,7 @@ class WearListenerService : WearableListenerService() {
                         vibrationEnabled = json.optBoolean("vibrationEnabled", true),
                         voiceoverEnabled = json.optBoolean("voiceoverEnabled", true),
                         personalBestDistanceKm = json.optDouble("personalBestDistanceKm", 0.0).toFloat(),
-                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0),
-                        activity = json.optString("activity", "RUNNING")
+                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0)
                     ))
                     WearSessionRepository.setSessionActive(true)
                 }

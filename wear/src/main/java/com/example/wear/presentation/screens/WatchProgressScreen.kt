@@ -14,8 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +31,8 @@ fun WatchProgressScreen(
     paused: Boolean = false,
     isStopped: Boolean = false,
     difficulty: String = "JUST VIBING",
-    vibrationEnabled: Boolean = true, // <--- ADICIONADO AQUI
+    needsSpeedUp: Boolean = false,
+    vibrationEnabled: Boolean = true,
     onPauseToggle: () -> Unit = {},
     onResume: () -> Unit = {},
     onEndSession: () -> Unit = {},
@@ -55,19 +54,40 @@ fun WatchProgressScreen(
         }
     }
 
-    val progressColor = when {
-        isStopped -> Color(0xFF7B1FA2)
-        localPaused -> Color(0xFF7B1FA2)
-        difficulty == "PUSHING LIMITS" -> Color(0xFFFF6F00)
-        else -> Color(0xFF1565C0)
+    // isStopped: pisca muito rápido (200ms)
+    // pushing limits + needsSpeedUp: pisca médio (600ms)
+    val blinkFrequency = when {
+        isStopped                                       -> 200
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> 600
+        else                                            -> 0
+    }
+
+    var blinkVisible by remember { mutableStateOf(true) }
+
+    LaunchedEffect(blinkFrequency) {
+        if (blinkFrequency == 0) {
+            blinkVisible = true
+        } else {
+            while (true) {
+                blinkVisible = true
+                kotlinx.coroutines.delay(blinkFrequency.toLong())
+                blinkVisible = false
+                kotlinx.coroutines.delay(blinkFrequency.toLong())
+            }
+        }
+    }
+
+    val arcColor = when {
+        isStopped                                       -> Color(0xFF9C27B0) // roxo
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> Color(0xFFFF6D00) // laranja
+        else                                            -> Color.White
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(askingToEnd, vibrationEnabled) { // <--- vibrationEnabled adicionado aos "keys" do pointerInput
-
+            .pointerInput(askingToEnd, vibrationEnabled) {
                 coroutineScope {
                     if (askingToEnd) {
                         launch {
@@ -80,7 +100,7 @@ fun WatchProgressScreen(
                                     }
                                 },
                                 onDoubleTap = {
-                                    if (vibrationEnabled) { // <--- VERIFICAÇÃO ADICIONADA
+                                    if (vibrationEnabled) {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                             vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
                                         } else {
@@ -88,23 +108,19 @@ fun WatchProgressScreen(
                                             vibrator.vibrate(500)
                                         }
                                     }
-
                                     onEndSession()
                                     askingToEnd = false
                                 }
                             )
                         }
                         launch {
-                            detectHorizontalDragGestures { change, _ ->
-                                change.consume()
-                            }
+                            detectHorizontalDragGestures { change, _ -> change.consume() }
                         }
-
                     } else {
                         launch {
                             detectTapGestures(
                                 onDoubleTap = {
-                                    if (vibrationEnabled) { // <--- VERIFICAÇÃO ADICIONADA
+                                    if (vibrationEnabled) {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                             vibrator.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
                                         } else {
@@ -116,7 +132,7 @@ fun WatchProgressScreen(
                                     onPauseToggle()
                                 },
                                 onLongPress = {
-                                    if (vibrationEnabled) { // <--- VERIFICAÇÃO ADICIONADA
+                                    if (vibrationEnabled) {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                             vibrator.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
                                         } else {
@@ -124,14 +140,11 @@ fun WatchProgressScreen(
                                             vibrator.vibrate(400)
                                         }
                                     }
-
                                     wasPausedBeforeAsking = localPaused
-
                                     if (!localPaused) {
                                         localPaused = true
                                         onPauseToggle()
                                     }
-
                                     askingToEnd = true
                                     onSpeakRequest("Finish session? Single tap for no, double tap for yes.")
                                 }
@@ -153,29 +166,15 @@ fun WatchProgressScreen(
             )
         } else {
             Canvas(modifier = Modifier.size(160.dp)) {
-                drawCircle(
-                    color = Color.DarkGray,
-                    radius = size.minDimension / 2f,
-                    style = Stroke(width = 14f)
-                )
-                drawArc(
-                    color = progressColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress,
-                    useCenter = false,
-                    style = Stroke(width = 14f, cap = StrokeCap.Round)
-                )
+                if (blinkVisible) {
+                    drawArc(
+                        color = arcColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * progress.coerceIn(0f, 1f),
+                        useCenter = true
+                    )
+                }
             }
-            Text(
-                text = when {
-                    isStopped  -> "STOPPED"
-                    localPaused -> "PAUSED"
-                    else        -> "L$level"
-                },
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

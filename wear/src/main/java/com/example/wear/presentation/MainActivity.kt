@@ -102,6 +102,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     paused = session.paused,
                     isStopped = session.isStopped,
                     difficulty = session.difficulty,
+                    needsSpeedUp = session.needsSpeedUp,
+                    vibrationEnabled = session.vibrationEnabled,
                     onPauseToggle = {
                         val newPaused = !session.paused
                         WearSessionRepository.update(session.copy(paused = newPaused))
@@ -142,7 +144,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         super.onResume()
         Wearable.getMessageClient(this).addListener(this)
         stepCounterSensor?.also { sensor ->
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_FASTEST)
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
         }
     }
 
@@ -283,6 +285,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
         if (!personalBestAnnounced && pbDistanceMeters > 0f && currentDistanceMeters > pbDistanceMeters) {
             personalBestAnnounced = true
+            WearSessionRepository.update(session.copy(needsSpeedUp = false))
             speak("New personal best! ${String.format(Locale.US, "%.2f", currentDistanceMeters / 1000f)} kilometers.")
             return
         }
@@ -296,17 +299,22 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
         when {
             currentDistanceMeters >= pbDistanceMeters -> {
+                WearSessionRepository.update(session.copy(needsSpeedUp = false))
                 speak("You are beating your personal best. Keep going.")
             }
             remainingPbSteps <= 0 -> {
+                WearSessionRepository.update(session.copy(needsSpeedUp = false))
                 speak("Keep going. Focus on finishing strong.")
             }
             else -> {
                 val remainingSessionSteps = session.targetSteps - steps
                 if (remainingSessionSteps <= 0) return
                 if (remainingPbDistance <= remainingSessionSteps * 0.78f) {
+                    WearSessionRepository.update(session.copy(needsSpeedUp = false))
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
+                    // Precisa de acelerar para bater o recorde — acende o laranja piscante
+                    WearSessionRepository.update(session.copy(needsSpeedUp = true))
                     speak("You can still beat your personal best if you speed up a little.")
                 }
             }
@@ -315,27 +323,23 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private fun startStopCheckLoop() {
         stopCheckJob?.cancel()
-
         stopCheckJob = scope.launch {
             var everStarted = false
 
-            val sessionActivity = WearSessionRepository.session.value.activity.uppercase()
 
-            val startDelay = if (sessionActivity == "WALK") 15_000L else 10_000L
+            val sessionActivity = WearSessionRepository.session.value.activity.uppercase()
+            val startDelay = if (sessionActivity == "WALK") 10_000L else 7_000L
             delay(startDelay)
 
             while (isActive) {
-                if (!WearSessionRepository.sessionActive.value) {
-                    break
-                }
-
                 val session = WearSessionRepository.session.value
-
+                if (!WearSessionRepository.sessionActive.value) break
                 if (session.paused || session.difficulty == "JUST VIBING") {
                     lastStepsForStopCheck = sessionSteps
                     delay(3000)
                     continue
                 }
+
 
                 val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
                 val hasMoved = sessionSteps > lastStepsForStopCheck + stepThreshold
@@ -343,21 +347,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 if (hasMoved) {
                     everStarted = true
                     stopWarningSent = false
-
-                    if (session.isStopped) {
-                        WearSessionRepository.update(session.copy(isStopped = false))
-                    }
-
-                    lastStepsForStopCheck = sessionSteps
-
+                    WearSessionRepository.update(session.copy(isStopped = false))
                 } else if (!hasMoved && !stopWarningSent) {
                     stopWarningSent = true
-
                     if (everStarted) {
-                        if (!WearSessionRepository.sessionActive.value) {
-                            break
-                        }
-
                         WearSessionRepository.update(session.copy(isStopped = true))
                         vibrate("stop_warning")
                         speak("You stopped. Let's keep going.")
@@ -365,22 +358,15 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         vibrate("nudge")
                         val prompt = when (session.activity.uppercase()) {
                             "WALK" -> "Let's start walking."
-                            else -> "Let's start running."
+                            else      -> "Let's start running."
                         }
                         speak(prompt)
                     }
-
-                    lastStepsForStopCheck = sessionSteps
                 }
 
-                val checkInterval = if (session.isStopped) {
-                    1_000L
-                } else if (session.activity.uppercase() == "WALK") {
-                    6_000L
-                } else {
-                    3_000L
-                }
+                lastStepsForStopCheck = sessionSteps
 
+                val checkInterval = if (session.activity.uppercase() == "WALK") 5_000L else 3_000L
                 delay(if (everStarted) checkInterval else 7_000L)
             }
         }
@@ -396,32 +382,15 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private fun onSessionComplete(session: SessionData) {
         stopCheckJob?.cancel()
-        timerJob?.cancel()
-
-        WearSessionRepository.update(
-            session.copy(
-                isStopped = false,
-                paused = false
-            )
-        )
-
         vibrate("session_complete")
         speak("Workout complete.")
-
         val distanceMeters = sessionSteps * 0.78f
-
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
             realElapsedSeconds()
         }
-
-        sendSessionResult(
-            distanceMeters = distanceMeters,
-            elapsedSeconds = elapsedSeconds,
-            endedEarly = false
-        )
-
+        sendSessionResult(distanceMeters, elapsedSeconds, endedEarly = false)
         WearSessionRepository.setSessionActive(false)
     }
 
@@ -464,7 +433,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             "nudge"            -> longArrayOf(0, 80)
             "halfway"          -> longArrayOf(0, 120)
             "level_complete"   -> longArrayOf(0, 150, 100, 150)
-            "stop_warning"     -> longArrayOf(0, 400, 100, 400, 100, 400)
+            "stop_warning" -> longArrayOf(0, 400, 100, 400, 100, 400)
             "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
             else               -> longArrayOf(0, 100)
         }
@@ -483,12 +452,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     }
 
     private fun resetSessionState() {
-        WearSessionRepository.update(
-            WearSessionRepository.session.value.copy(
-                isStopped = false,
-                paused = false
-            )
-        )
         lastLevel = 1
         halfwayAnnounced = false
         levelEndAnnounced = false
