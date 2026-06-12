@@ -57,8 +57,9 @@ fun WatchProgressScreen(
     // isStopped: pisca muito rápido (200ms)
     // pushing limits + needsSpeedUp: pisca médio (600ms)
     val blinkFrequency = when {
-        isStopped                                       -> 200
-        difficulty == "PUSHING LIMITS" && needsSpeedUp -> 600
+        localPaused                                     -> 500  // branco lento ao pausar
+        isStopped                                       -> 200  // roxo rápido ao parar
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> 600  // laranja médio
         else                                            -> 0
     }
 
@@ -78,8 +79,9 @@ fun WatchProgressScreen(
     }
 
     val arcColor = when {
-        isStopped                                       -> Color(0xFF9C27B0) // roxo
-        difficulty == "PUSHING LIMITS" && needsSpeedUp -> Color(0xFFFF6D00) // laranja
+        localPaused                                     -> Color.White          // pausa → branco
+        isStopped                                       -> Color(0xFF9C27B0)   // parado → roxo
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> Color(0xFFFF6D00)   // push → laranja
         else                                            -> Color.White
     }
 
@@ -87,7 +89,7 @@ fun WatchProgressScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(askingToEnd, vibrationEnabled) {
+            .pointerInput(askingToEnd, vibrationEnabled, isStopped) {
                 coroutineScope {
                     if (askingToEnd) {
                         launch {
@@ -129,6 +131,8 @@ fun WatchProgressScreen(
                                         }
                                     }
                                     localPaused = !localPaused
+                                    if (localPaused) onSpeakRequest("You paused.")
+                                    else onSpeakRequest("Returning to session.")
                                     onPauseToggle()
                                 },
                                 onLongPress = {

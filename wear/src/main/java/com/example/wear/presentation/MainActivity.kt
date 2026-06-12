@@ -335,9 +335,19 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 val session = WearSessionRepository.session.value
                 if (!WearSessionRepository.sessionActive.value) break
                 if (session.paused || session.difficulty == "JUST VIBING") {
+                    // Ao pausar, limpa o stopped visualmente — mas guarda stopWarningSent
+                    // para que ao despausar o roxo volte se ainda não começou a andar
+                    if (session.isStopped) {
+                        WearSessionRepository.update(session.copy(isStopped = false))
+                    }
                     lastStepsForStopCheck = sessionSteps
                     delay(3000)
                     continue
+                }
+
+                // Se despausou mas nunca começou a andar, volta a marcar stopped imediatamente
+                if (!everStarted) {
+                    WearSessionRepository.update(session.copy(isStopped = true))
                 }
 
 
@@ -358,9 +368,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         vibrate("nudge")
                         val prompt = when (session.activity.uppercase()) {
                             "WALK" -> "Let's start walking."
-                            else      -> "Let's start running."
+                            else   -> "Let's start running."
                         }
                         speak(prompt)
+                        // Permite repetir o aviso enquanto a pessoa não começar
+                        stopWarningSent = false
                     }
                 }
 
