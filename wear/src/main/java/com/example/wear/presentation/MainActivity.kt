@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var accelerometerSensor: Sensor? = null
     private var initialSteps: Float? = null
     private var lastDetectedStepMs: Long = 0L
-    private var accelMovementMs: Long = 0L      // último momento em que o acelerómetro detetou movimento
+    private var accelMovementMs: Long = 0L
 
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
@@ -68,8 +68,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             }
         }
 
-        sensorManager  = getSystemService(SENSOR_SERVICE) as SensorManager
-        stepCounterSensor  = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        sensorManager       = getSystemService(SENSOR_SERVICE) as SensorManager
+        stepCounterSensor   = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
@@ -225,14 +225,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         if (!WearSessionRepository.sessionActive.value) return
         if (session.paused) return
 
-        // Acelerómetro: deteta movimento real em tempo real (funciona em todos os dispositivos)
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
             val x = event.values[0]
             val y = event.values[1]
             val z = event.values[2]
             val magnitude = Math.sqrt((x * x + y * y + z * z).toDouble()).toFloat()
-            // Threshold mais alto (13.0) para evitar falsos positivos de tremores do pulso
-            // Andar normal gera picos de 13-18 m/s²; estático fica entre 9.5-11.5
             if (magnitude > 12.0f) {
                 lastDetectedStepMs = System.currentTimeMillis()
             }
@@ -251,7 +248,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
         if (session.goalType == "DISTANCE") {
             progress = (sessionSteps.toFloat() / session.targetSteps).coerceIn(0f, 1f)
-
             val targetDistanceMeters = session.goalValue.extractNumber() * 1000
             val metersPerCheckpoint = 200
             val totalLevels = (targetDistanceMeters / metersPerCheckpoint).coerceAtLeast(1)
@@ -335,7 +331,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     WearSessionRepository.update(session.copy(needsSpeedUp = false))
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
-                    // Precisa de acelerar para bater o recorde — acende o laranja piscante
                     WearSessionRepository.update(session.copy(needsSpeedUp = true))
                     speak("You can still beat your personal best if you speed up a little.")
                 }
@@ -348,13 +343,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopCheckJob = scope.launch {
             var everStarted = false
             var lastNudgeMs = 0L
-            var movementStreak = 0  // iterações consecutivas com movimento detetado
+            var movementStreak = 0
+            var stoppedSinceMs = 0L  // timestamp de quando parou; 0 = está a mover-se
             stopWarningSent = false
-
-            // Inicializa a 0 para que recentStepDetected não seja true logo de início
             lastDetectedStepMs = 0L
 
-            // Delay inicial — dar tempo ao sensor de arrancar e à pessoa de se preparar
             delay(5_000L)
 
             while (isActive) {
@@ -364,6 +357,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     if (session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = false))
                     }
+                    stoppedSinceMs = 0L
                     delay(1_000L)
                     continue
                 }
@@ -373,8 +367,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
                 val hasMoved = recentStepDetected || sessionSteps > lastStepsForStopCheck + stepThreshold
 
-                // everStarted só fica true depois de 2 iterações consecutivas com movimento
-                // (evita que um único pico espúrio do acelerómetro confirme o início)
                 if (hasMoved) {
                     movementStreak++
                     if (!everStarted && movementStreak >= 1) everStarted = true
@@ -383,37 +375,44 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 }
 
                 if (hasMoved && everStarted) {
+                    // Está a mover-se — limpa tudo
                     stopWarningSent = false
+                    stoppedSinceMs = 0L
                     if (session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = false))
                     }
+                } else if (!everStarted) {
+                    // Ainda não começou — aviso de 5 em 5 segundos
+                    WearSessionRepository.update(session.copy(isStopped = true))
+                    val now = System.currentTimeMillis()
+                    if (now - lastNudgeMs >= 5_000L) {
+                        lastNudgeMs = now
+                        vibrate("nudge")
+                        val prompt = when (session.activity.uppercase()) {
+                            "WALK" -> "Let's start walking."
+                            else   -> "Let's start running."
+                        }
+                        speak(prompt)
+                    }
                 } else {
-                    if (!everStarted) {
-                        // Pessoa ainda não começou — aviso de 5 em 5 segundos
+                    // Já tinha começado mas parou
+                    val now = System.currentTimeMillis()
+                    if (stoppedSinceMs == 0L) stoppedSinceMs = now
+
+                    // Círculo roxo logo que para
+                    if (!session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = true))
-                        val now = System.currentTimeMillis()
-                        if (now - lastNudgeMs >= 5_000L) {
-                            lastNudgeMs = now
-                            vibrate("nudge")
-                            val prompt = when (session.activity.uppercase()) {
-                                "WALK" -> "Let's start walking."
-                                else   -> "Let's start running."
-                            }
-                            speak(prompt)
-                        }
-                    } else {
-                        // Pessoa já tinha começado mas parou
-                        if (!stopWarningSent) {
-                            WearSessionRepository.update(session.copy(isStopped = true))
-                            vibrate("stop_warning")
-                            speak("You stopped. Let's keep going.")
-                            stopWarningSent = true
-                        }
+                    }
+
+                    // Voz + vibração só depois de 5 segundos parado
+                    if (!stopWarningSent && (now - stoppedSinceMs) >= 5_000L) {
+                        vibrate("stop_warning")
+                        speak("You stopped. Let's keep going.")
+                        stopWarningSent = true
                     }
                 }
 
                 lastStepsForStopCheck = sessionSteps
-
                 delay(1_500L)
             }
         }
@@ -480,7 +479,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             "nudge"            -> longArrayOf(0, 80)
             "halfway"          -> longArrayOf(0, 120)
             "level_complete"   -> longArrayOf(0, 150, 100, 150)
-            "stop_warning" -> longArrayOf(0, 400, 100, 400, 100, 400)
+            "stop_warning"     -> longArrayOf(0, 400, 100, 400, 100, 400)
             "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
             else               -> longArrayOf(0, 100)
         }
