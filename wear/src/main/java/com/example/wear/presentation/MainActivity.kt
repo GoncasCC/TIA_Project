@@ -29,9 +29,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private lateinit var sensorManager: SensorManager
     private var stepCounterSensor: Sensor? = null
-    private var stepDetectorSensor: Sensor? = null
+    private var accelerometerSensor: Sensor? = null
     private var initialSteps: Float? = null
     private var lastDetectedStepMs: Long = 0L
+    private var accelMovementMs: Long = 0L      // último momento em que o acelerómetro detetou movimento
 
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
@@ -67,9 +68,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             }
         }
 
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        sensorManager  = getSystemService(SENSOR_SERVICE) as SensorManager
         stepCounterSensor  = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-        stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
@@ -149,8 +150,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stepCounterSensor?.also { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
         }
-        stepDetectorSensor?.also { sensor ->
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_FASTEST)
+        accelerometerSensor?.also { sensor ->
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
         }
     }
 
@@ -224,8 +225,17 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         if (!WearSessionRepository.sessionActive.value) return
         if (session.paused) return
 
-        if (event?.sensor?.type == Sensor.TYPE_STEP_DETECTOR) {
-            lastDetectedStepMs = System.currentTimeMillis()
+        // Acelerómetro: deteta movimento real em tempo real (funciona em todos os dispositivos)
+        if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            // Magnitude da aceleração sem gravidade — andar normal gera ~11-14 m/s²
+            val magnitude = Math.sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+            // Threshold: 11.5 filtra movimento estático (gravidade = 9.8) mas apanha caminhada
+            if (magnitude > 11.5f) {
+                lastDetectedStepMs = System.currentTimeMillis()
+            }
             return
         }
 
@@ -325,6 +335,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     WearSessionRepository.update(session.copy(needsSpeedUp = false))
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
+                    // Precisa de acelerar para bater o recorde — acende o laranja piscante
                     WearSessionRepository.update(session.copy(needsSpeedUp = true))
                     speak("You can still beat your personal best if you speed up a little.")
                 }
@@ -337,10 +348,13 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopCheckJob = scope.launch {
             var everStarted = false
 
+            // Inicializa com o tempo atual para que recentStepDetected não seja true logo de início
+            lastDetectedStepMs = 0L
 
-            val sessionActivity = WearSessionRepository.session.value.activity.uppercase()
-            val startDelay = if (sessionActivity == "WALK") 10_000L else 7_000L
-            delay(startDelay)
+            // Delay inicial curto — apenas para dar tempo ao sensor de arrancar
+            delay(3_000L)
+
+            var firstCheckDone = false
 
             while (isActive) {
                 val session = WearSessionRepository.session.value
@@ -349,22 +363,30 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     if (session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = false))
                     }
-
-                    delay(3000)
+                    delay(1_000L)
                     continue
                 }
 
+                val recentStepDetected = lastDetectedStepMs > 0L &&
+                        (System.currentTimeMillis() - lastDetectedStepMs) < 4_000L
                 val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
-                val recentStepDetected = (System.currentTimeMillis() - lastDetectedStepMs) < 8_000L
                 val hasMoved = recentStepDetected || sessionSteps > lastStepsForStopCheck + stepThreshold
 
                 if (hasMoved) {
                     everStarted = true
+                    firstCheckDone = true
                     stopWarningSent = false
                     if (session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = false))
                     }
                 } else {
+                    if (!firstCheckDone) {
+                        // Primeira verificação após os 3s iniciais — dá mais 5s de graça
+                        firstCheckDone = true
+                        lastStepsForStopCheck = sessionSteps
+                        delay(5_000L)
+                        continue
+                    }
                     if (!everStarted) {
                         WearSessionRepository.update(session.copy(isStopped = true))
                     }
@@ -381,14 +403,15 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                                 else   -> "Let's start running."
                             }
                             speak(prompt)
+                            // Não marca stopWarningSent=true — repete enquanto não começar
                         }
                     }
                 }
 
                 lastStepsForStopCheck = sessionSteps
 
-                val checkInterval = if (session.activity.uppercase() == "WALK") 5_000L else 3_000L
-                delay(if (everStarted) checkInterval else 7_000L)
+                // Verifica a cada 2s — rápido o suficiente para detetar paragem e recomeço
+                delay(2_000L)
             }
         }
     }
