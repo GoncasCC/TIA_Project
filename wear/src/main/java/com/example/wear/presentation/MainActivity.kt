@@ -368,7 +368,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 }
 
                 val recentStepDetected = lastDetectedStepMs > 0L &&
-                        (System.currentTimeMillis() - lastDetectedStepMs) < 4_000L
+                        (System.currentTimeMillis() - lastDetectedStepMs) < 1_500L
                 val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
                 val hasMoved = recentStepDetected || sessionSteps > lastStepsForStopCheck + stepThreshold
 
@@ -410,8 +410,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
                 lastStepsForStopCheck = sessionSteps
 
-                // Verifica a cada 2s — rápido o suficiente para detetar paragem e recomeço
-                delay(2_000L)
+                // Verifica a cada 1s — deteção rápida de paragem e recomeço
+                delay(1_000L)
             }
         }
     }
