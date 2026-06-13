@@ -344,7 +344,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             var everStarted = false
             var lastNudgeMs = 0L
             var movementStreak = 0
-            var stoppedSinceMs = 0L  // timestamp de quando parou; 0 = está a mover-se
+            var stoppedSinceMs = 0L
             stopWarningSent = false
             lastDetectedStepMs = 0L
 
@@ -375,14 +375,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 }
 
                 if (hasMoved && everStarted) {
-                    // Está a mover-se — limpa tudo
                     stopWarningSent = false
                     stoppedSinceMs = 0L
                     if (session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = false))
                     }
                 } else if (!everStarted) {
-                    // Ainda não começou — aviso de 5 em 5 segundos
                     WearSessionRepository.update(session.copy(isStopped = true))
                     val now = System.currentTimeMillis()
                     if (now - lastNudgeMs >= 5_000L) {
@@ -395,16 +393,15 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         speak(prompt)
                     }
                 } else {
-                    // Já tinha começado mas parou
+
                     val now = System.currentTimeMillis()
                     if (stoppedSinceMs == 0L) stoppedSinceMs = now
 
-                    // Círculo roxo logo que para
+
                     if (!session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = true))
                     }
 
-                    // Voz + vibração só depois de 5 segundos parado
                     if (!stopWarningSent && (now - stoppedSinceMs) >= 5_000L) {
                         vibrate("stop_warning")
                         speak("You stopped. Let's keep going.")

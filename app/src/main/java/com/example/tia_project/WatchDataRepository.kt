@@ -34,7 +34,6 @@ object WatchDataRepository {
     private val _result = MutableStateFlow(WatchSessionResult())
     val result: StateFlow<WatchSessionResult> = _result.asStateFlow()
 
-    // Nível atual enviado pelo watch (para trocar música)
     private val _level = MutableStateFlow(0)
     val level: StateFlow<Int> = _level.asStateFlow()
 

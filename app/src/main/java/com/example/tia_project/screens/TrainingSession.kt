@@ -34,7 +34,6 @@ fun TrainingSession(
     val targetDistanceMeters = remember(goalValue) { goalValue.extractNumber() * 1000f }
     val targetTimeSeconds = remember(goalValue) { goalValue.extractNumber() * 60 }
 
-    // Modo "1 minuto": deve tocar sempre a música 5
     val isOneMinuteMode = goalType == "TIME" && goalValue.extractNumber() == 1
 
     var isPaused by remember { mutableStateOf(false) }

@@ -54,12 +54,11 @@ fun WatchProgressScreen(
         }
     }
 
-    // isStopped: pisca muito rápido (200ms)
-    // pushing limits + needsSpeedUp: pisca médio (600ms)
+
     val blinkFrequency = when {
-        localPaused                                     -> 500  // branco lento ao pausar
-        isStopped                                       -> 200  // roxo rápido ao parar
-        difficulty == "PUSHING LIMITS" && needsSpeedUp -> 600  // laranja médio
+        localPaused                                     -> 500
+        isStopped                                       -> 200
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> 600
         else                                            -> 0
     }
 
@@ -79,9 +78,9 @@ fun WatchProgressScreen(
     }
 
     val arcColor = when {
-        localPaused                                     -> Color.White          // pausa → branco
-        isStopped                                       -> Color(0xFF9C27B0)   // parado → roxo
-        difficulty == "PUSHING LIMITS" && needsSpeedUp -> Color(0xFFFF6D00)   // push → laranja
+        localPaused                                     -> Color.White
+        isStopped                                       -> Color(0xFF9C27B0)
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> Color(0xFFFF6D00)
         else                                            -> Color.White
     }
 
