@@ -29,7 +29,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private lateinit var sensorManager: SensorManager
     private var stepCounterSensor: Sensor? = null
+    private var stepDetectorSensor: Sensor? = null
     private var initialSteps: Float? = null
+    private var lastDetectedStepMs: Long = 0L
 
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
@@ -66,7 +68,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        stepCounterSensor  = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED) {
@@ -146,6 +149,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stepCounterSensor?.also { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
         }
+        stepDetectorSensor?.also { sensor ->
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_FASTEST)
+        }
     }
 
     override fun onPause() {
@@ -217,6 +223,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         val session = WearSessionRepository.session.value
         if (!WearSessionRepository.sessionActive.value) return
         if (session.paused) return
+
+        if (event?.sensor?.type == Sensor.TYPE_STEP_DETECTOR) {
+            lastDetectedStepMs = System.currentTimeMillis()
+            return
+        }
+
         if (event?.sensor?.type != Sensor.TYPE_STEP_COUNTER) return
 
         val totalSteps = event.values[0]
@@ -313,7 +325,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     WearSessionRepository.update(session.copy(needsSpeedUp = false))
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
-                    // Precisa de acelerar para bater o recorde — acende o laranja piscante
                     WearSessionRepository.update(session.copy(needsSpeedUp = true))
                     speak("You can still beat your personal best if you speed up a little.")
                 }
@@ -335,44 +346,42 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 val session = WearSessionRepository.session.value
                 if (!WearSessionRepository.sessionActive.value) break
                 if (session.paused || session.difficulty == "JUST VIBING") {
-                    // Ao pausar, limpa o stopped visualmente — mas guarda stopWarningSent
-                    // para que ao despausar o roxo volte se ainda não começou a andar
                     if (session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = false))
                     }
-                    lastStepsForStopCheck = sessionSteps
+
                     delay(3000)
                     continue
                 }
 
-                // Se despausou mas nunca começou a andar, volta a marcar stopped imediatamente
-                if (!everStarted) {
-                    WearSessionRepository.update(session.copy(isStopped = true))
-                }
-
-
                 val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
-                val hasMoved = sessionSteps > lastStepsForStopCheck + stepThreshold
+                val recentStepDetected = (System.currentTimeMillis() - lastDetectedStepMs) < 8_000L
+                val hasMoved = recentStepDetected || sessionSteps > lastStepsForStopCheck + stepThreshold
 
                 if (hasMoved) {
                     everStarted = true
                     stopWarningSent = false
-                    WearSessionRepository.update(session.copy(isStopped = false))
-                } else if (!hasMoved && !stopWarningSent) {
-                    stopWarningSent = true
-                    if (everStarted) {
+                    if (session.isStopped) {
+                        WearSessionRepository.update(session.copy(isStopped = false))
+                    }
+                } else {
+                    if (!everStarted) {
                         WearSessionRepository.update(session.copy(isStopped = true))
-                        vibrate("stop_warning")
-                        speak("You stopped. Let's keep going.")
-                    } else {
-                        vibrate("nudge")
-                        val prompt = when (session.activity.uppercase()) {
-                            "WALK" -> "Let's start walking."
-                            else   -> "Let's start running."
+                    }
+                    if (!stopWarningSent) {
+                        if (everStarted) {
+                            WearSessionRepository.update(session.copy(isStopped = true))
+                            vibrate("stop_warning")
+                            speak("You stopped. Let's keep going.")
+                            stopWarningSent = true
+                        } else {
+                            vibrate("nudge")
+                            val prompt = when (session.activity.uppercase()) {
+                                "WALK" -> "Let's start walking."
+                                else   -> "Let's start running."
+                            }
+                            speak(prompt)
                         }
-                        speak(prompt)
-                        // Permite repetir o aviso enquanto a pessoa não começar
-                        stopWarningSent = false
                     }
                 }
 
