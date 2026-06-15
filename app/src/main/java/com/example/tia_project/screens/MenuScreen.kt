@@ -88,6 +88,7 @@ private fun OptionTextMenuScreen(
     var dragAmountTotal by remember { mutableStateOf(0f) }
     var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
     var hasAnnouncedMenuEntry by remember { mutableStateOf(false) }
+    var isNavigating by remember { mutableStateOf(false) }
 
     val selectedOption = options[selectedIndex]
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -199,6 +200,8 @@ private fun OptionTextMenuScreen(
                     launch {
                         detectTapGestures(
                             onDoubleTap = {
+                                if (isNavigating) return@detectTapGestures
+                                isNavigating = true
                                 vibrate(150)
 
                                 launch {
@@ -229,6 +232,7 @@ private fun OptionTextMenuScreen(
                             }
                         ) { change, dragAmount ->
                             change.consume()
+                            if (isNavigating) return@detectHorizontalDragGestures
                             dragAmountTotal += dragAmount
 
                             if (!hasChangedOptionThisSwipe) {
