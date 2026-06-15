@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var stopWarningSent = false
     private var lastStepsForStopCheck = 0
     private var personalBestAnnounced = false
-    private var lastMotivationStep = 0
+    private var lastMotivationMs = 0L
     private var sessionSteps = 0
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     stopWarningSent = false
                     lastStepsForStopCheck = 0
                     personalBestAnnounced = false
-                    lastMotivationStep = 0
+                    lastMotivationMs = 0L
                 }
             }
 
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     },
                     onEndSession = {
                         sendSessionResult(
-                            distanceMeters = sessionSteps * 0.78f,
+                            distanceMeters = sessionSteps * 0.7f,
                             elapsedSeconds = if (WearSessionRepository.session.value.goalType == "TIME") {
                                 val p = session.progress
                                 val targetSecs = session.goalValue.extractNumber() * 60
@@ -299,7 +299,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private fun handlePersonalBestFeedback(steps: Int, session: SessionData) {
         val pbDistanceMeters = session.personalBestDistanceKm * 1000f
-        val currentDistanceMeters = steps * 0.78f
+        val currentDistanceMeters = steps * 0.7f
 
         if (!personalBestAnnounced && pbDistanceMeters > 0f && currentDistanceMeters > pbDistanceMeters) {
             personalBestAnnounced = true
@@ -308,12 +308,13 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             return
         }
 
-        if (steps - lastMotivationStep < 128) return
-        lastMotivationStep = steps
+        val now = System.currentTimeMillis()
+        if (now - lastMotivationMs < 15_000L) return
+        lastMotivationMs = now
 
-        val pbSteps = (pbDistanceMeters / 0.78f).toInt()
+        val pbSteps = (pbDistanceMeters / 0.7f).toInt()
         val remainingPbSteps = pbSteps - steps
-        val remainingPbDistance = remainingPbSteps * 0.78f
+        val remainingPbDistance = remainingPbSteps * 0.7f
 
         when {
             currentDistanceMeters >= pbDistanceMeters -> {
@@ -327,7 +328,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             else -> {
                 val remainingSessionSteps = session.targetSteps - steps
                 if (remainingSessionSteps <= 0) return
-                if (remainingPbDistance <= remainingSessionSteps * 0.78f) {
+                if (remainingPbDistance <= remainingSessionSteps * 0.7f) {
                     WearSessionRepository.update(session.copy(needsSpeedUp = false))
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
@@ -393,10 +394,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         speak(prompt)
                     }
                 } else {
-
                     val now = System.currentTimeMillis()
                     if (stoppedSinceMs == 0L) stoppedSinceMs = now
-
 
                     if (!session.isStopped) {
                         WearSessionRepository.update(session.copy(isStopped = true))
@@ -410,6 +409,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 }
 
                 lastStepsForStopCheck = sessionSteps
+
+                if (session.difficulty == "PUSHING LIMITS" && everStarted) {
+                    handlePersonalBestFeedback(sessionSteps, session)
+                }
+
                 delay(1_500L)
             }
         }
@@ -427,7 +431,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopCheckJob?.cancel()
         vibrate("session_complete")
         speak("Workout complete.")
-        val distanceMeters = sessionSteps * 0.78f
+        val distanceMeters = sessionSteps * 0.7f
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
@@ -501,7 +505,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopWarningSent = false
         lastStepsForStopCheck = 0
         personalBestAnnounced = false
-        lastMotivationStep = 0
+        lastMotivationMs = 0L
         sessionSteps = 0
         initialSteps = null
         timerJob?.cancel()

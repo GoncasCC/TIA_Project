@@ -208,7 +208,7 @@ private fun getPersonalBestSession(context: Context): SavedSession? {
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
 
 private fun estimateTargetSteps(targetDistanceMeters: Float): Int {
-    val averageStrideMeters = 0.78f
+    val averageStrideMeters = 0.7f
     return (targetDistanceMeters / averageStrideMeters).toInt().coerceAtLeast(1)
 }
 
