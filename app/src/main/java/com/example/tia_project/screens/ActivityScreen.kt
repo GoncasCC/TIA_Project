@@ -135,7 +135,7 @@ private fun OptionSelectionScreen(
     var selectedIndex by remember { mutableStateOf(0) }
     var dragAmountTotal by remember { mutableStateOf(0f) }
     var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
-    var isNavigating by remember { mutableStateOf(false) } // Bloqueio de navegação dupla
+    var isNavigating by remember { mutableStateOf(false) }
 
     val selectedOption = options[selectedIndex]
     val context = LocalContext.current
@@ -211,7 +211,7 @@ private fun OptionSelectionScreen(
                     launch {
                         detectTapGestures(
                             onDoubleTap = {
-                                if (isNavigating) return@detectTapGestures // Bloqueia toques duplos adicionais
+                                if (isNavigating) return@detectTapGestures
                                 isNavigating = true
                                 vibrate(150)
                                 speak("Selected.", "selected")
@@ -249,7 +249,7 @@ private fun OptionSelectionScreen(
                             }
                         ) { change, dragAmount ->
                             change.consume()
-                            if (isNavigating) return@detectHorizontalDragGestures // Impede swipe enquanto navega
+                            if (isNavigating) return@detectHorizontalDragGestures
                             dragAmountTotal += dragAmount
 
                             if (!hasChangedOptionThisSwipe) {
@@ -433,7 +433,7 @@ fun DifficultyScreen(
     var selectedIndex by remember { mutableStateOf(0) }
     var dragAmountTotal by remember { mutableStateOf(0f) }
     var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
-    var isNavigating by remember { mutableStateOf(false) } // Bloqueio de navegação dupla
+    var isNavigating by remember { mutableStateOf(false) }
 
     val selectedOption = options[selectedIndex]
     val context = LocalContext.current
@@ -771,7 +771,7 @@ fun SummaryScreen(
                         }
                     },
                     onLongPress = {
-                        if (!confirmed) { // Proteção extra também no cancelar
+                        if (!confirmed) {
                             confirmed = true
                             vibrate(400)
                             speak("Cancelled.", "cancelled_summary")
