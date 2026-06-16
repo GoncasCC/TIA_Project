@@ -26,6 +26,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+sealed class Page {
+    data class PBMode(val label: String, val value: String, val speech: String) : Page()
+    data class StatsPeriod(val period: String) : Page()
+}
+
 @Composable
 fun ProgressScreen(
     voiceoverEnabled: Boolean,
@@ -39,15 +44,7 @@ fun ProgressScreen(
     val textColor = if (darkModeEnabled) Color.White else Color.Black
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
 
-    val periods = listOf("PERSONAL BEST", "TODAY", "YESTERDAY", "THIS WEEK", "THIS MONTH", "ALL TIME")
-
-    var selectedIndex by remember { mutableStateOf(0) }
-    val selectedPeriod = periods[selectedIndex]
-
     val sessions = remember { loadSavedSessions(context) }
-    val progressData = remember(selectedPeriod, sessions) {
-        calculateProgressForPeriod(selectedPeriod, sessions)
-    }
 
     val pb1Min = remember(sessions) {
         sessions.filter { it.mode == "1 MIN" }.maxByOrNull { it.distanceKm }
@@ -57,6 +54,43 @@ fun ProgressScreen(
     }
     val pb1Km = remember(sessions) {
         sessions.filter { it.mode == "1 KM" && it.timeSeconds > 0 }.minByOrNull { it.timeSeconds }
+    }
+
+    val pages: List<Page> = listOf(
+        Page.PBMode(
+            label = "1 MIN MODE",
+            value = if (pb1Min != null) String.format(Locale.US, "%.2f KM", pb1Min.distanceKm) else "---",
+            speech = if (pb1Min != null) "Personal best, 1 minute mode: ${String.format(Locale.US, "%.2f", pb1Min.distanceKm)} kilometers"
+            else "Personal best, 1 minute mode: no record yet"
+        ),
+        Page.PBMode(
+            label = "5 MIN MODE",
+            value = if (pb5Min != null) String.format(Locale.US, "%.2f KM", pb5Min.distanceKm) else "---",
+            speech = if (pb5Min != null) "Personal best, 5 minutes mode: ${String.format(Locale.US, "%.2f", pb5Min.distanceKm)} kilometers"
+            else "Personal best, 5 minutes mode: no record yet"
+        ),
+        Page.PBMode(
+            label = "1 KM MODE",
+            value = if (pb1Km != null) pb1Km.timeSeconds.toReadableDuration() else "---",
+            speech = if (pb1Km != null) {
+                val m = pb1Km.timeSeconds / 60
+                val s = pb1Km.timeSeconds % 60
+                "Personal best, 1 kilometer mode: $m minutes and $s seconds"
+            } else "Personal best, 1 kilometer mode: no record yet"
+        ),
+        Page.StatsPeriod("TODAY"),
+        Page.StatsPeriod("YESTERDAY"),
+        Page.StatsPeriod("THIS WEEK"),
+        Page.StatsPeriod("THIS MONTH"),
+        Page.StatsPeriod("ALL TIME")
+    )
+
+    var pageIndex by remember { mutableStateOf(0) }
+    val currentPage = pages[pageIndex]
+
+    val progressData = remember(pageIndex, sessions) {
+        if (currentPage is Page.StatsPeriod) calculateProgressForPeriod(currentPage.period, sessions)
+        else ProgressData(0f, 0, 0)
     }
 
     val vibrator = remember(context) {
@@ -85,12 +119,6 @@ fun ProgressScreen(
     var isTtsReady by remember { mutableStateOf(false) }
     var isGoingBack by remember { mutableStateOf(false) }
 
-    fun speak(text: String, id: String) {
-        if (isTtsReady && voiceoverEnabled) {
-            tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
-        }
-    }
-
     DisposableEffect(Unit) {
         val textToSpeech = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -107,32 +135,23 @@ fun ProgressScreen(
         }
     }
 
-    LaunchedEffect(selectedPeriod, isTtsReady, voiceoverEnabled) {
-        if (!isGoingBack) {
-            if (selectedPeriod == "PERSONAL BEST") {
-                tts?.speak("Personal best.", TextToSpeech.QUEUE_FLUSH, null, "pb_header")
-                tts?.speak(
-                    if (pb1Min != null)
-                        "1 minute mode: ${String.format(Locale.US, "%.2f", pb1Min.distanceKm)} kilometers"
-                    else "1 minute mode: no record yet",
-                    TextToSpeech.QUEUE_ADD, null, "pb_1min"
-                )
-                tts?.speak(
-                    if (pb5Min != null)
-                        "5 minutes mode: ${String.format(Locale.US, "%.2f", pb5Min.distanceKm)} kilometers"
-                    else "5 minutes mode: no record yet",
-                    TextToSpeech.QUEUE_ADD, null, "pb_5min"
-                )
-                tts?.speak(
-                    if (pb1Km != null) {
-                        val mins = pb1Km.timeSeconds / 60
-                        val secs = pb1Km.timeSeconds % 60
-                        "1 kilometer mode: $mins minutes and $secs seconds"
-                    } else "1 kilometer mode: no record yet",
-                    TextToSpeech.QUEUE_ADD, null, "pb_1km"
-                )
-            } else {
-                speak(progressData.toSpeechText(selectedPeriod), "progress_${selectedPeriod.lowercase().replace(" ", "_")}")
+    LaunchedEffect(pageIndex, isTtsReady, voiceoverEnabled) {
+        if (isGoingBack || !isTtsReady || !voiceoverEnabled) return@LaunchedEffect
+        when (val page = currentPage) {
+            is Page.PBMode -> tts?.speak(page.speech, TextToSpeech.QUEUE_FLUSH, null, "page_$pageIndex")
+            is Page.StatsPeriod -> {
+                val periodText = when (page.period) {
+                    "TODAY" -> "Today"
+                    "YESTERDAY" -> "Yesterday"
+                    "THIS WEEK" -> "This week"
+                    "THIS MONTH" -> "This month"
+                    "ALL TIME" -> "All time"
+                    else -> page.period.lowercase()
+                }
+                val speech = "$periodText, you completed ${String.format(Locale.US, "%.2f", progressData.totalDistanceKm)} kilometers " +
+                        "in ${progressData.totalTimeSeconds.toReadableDurationForSpeech()}. " +
+                        "Total sessions: ${progressData.totalSessions}."
+                tts?.speak(speech, TextToSpeech.QUEUE_FLUSH, null, "page_$pageIndex")
             }
         }
     }
@@ -141,7 +160,7 @@ fun ProgressScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(selectedPeriod, vibrationEnabled, voiceoverEnabled) {
+            .pointerInput(pageIndex, vibrationEnabled, voiceoverEnabled) {
                 coroutineScope {
                     launch {
                         detectHorizontalDragGestures { change, dragAmount ->
@@ -149,12 +168,12 @@ fun ProgressScreen(
 
                             if (!isGoingBack) {
                                 if (dragAmount > 25f) {
-                                    selectedIndex =
-                                        if (selectedIndex == 0) periods.lastIndex else selectedIndex - 1
+                                    pageIndex =
+                                        if (pageIndex == 0) pages.lastIndex else pageIndex - 1
                                     vibrateNormal()
                                 } else if (dragAmount < -25f) {
-                                    selectedIndex =
-                                        if (selectedIndex == periods.lastIndex) 0 else selectedIndex + 1
+                                    pageIndex =
+                                        if (pageIndex == pages.lastIndex) 0 else pageIndex + 1
                                     vibrateNormal()
                                 }
                             }
@@ -216,110 +235,81 @@ fun ProgressScreen(
                     .offset(y = 80.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (selectedPeriod == "PERSONAL BEST") {
-                    Text(
-                        text = "PERSONAL BEST",
-                        color = accentColor,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                when (val page = currentPage) {
+                    is Page.PBMode -> {
+                        Text(
+                            text = "PERSONAL BEST",
+                            color = accentColor,
+                            fontSize = 44.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
-                    Spacer(modifier = Modifier.height(40.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        text = "1 MIN MODE",
-                        color = accentColor,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = if (pb1Min != null)
-                            String.format(Locale.US, "%.2f KM", pb1Min.distanceKm)
-                        else "---",
-                        color = textColor,
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                        Text(
+                            text = page.label,
+                            color = textColor,
+                            fontSize = 44.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = "5 MIN MODE",
-                        color = accentColor,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = if (pb5Min != null)
-                            String.format(Locale.US, "%.2f KM", pb5Min.distanceKm)
-                        else "---",
-                        color = textColor,
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                        Text(
+                            text = page.value,
+                            color = textColor,
+                            fontSize = 72.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    is Page.StatsPeriod -> {
+                        Text(
+                            text = page.period,
+                            color = accentColor,
+                            fontSize = 52.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                        Spacer(modifier = Modifier.height(70.dp))
 
-                    Text(
-                        text = "1 KM MODE",
-                        color = accentColor,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = if (pb1Km != null)
-                            pb1Km.timeSeconds.toReadableDuration()
-                        else "---",
-                        color = textColor,
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                } else {
-                    Text(
-                        text = selectedPeriod,
-                        color = accentColor,
-                        fontSize = 52.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
+                        Text(
+                            text = String.format(Locale.US, "%.2f KM", progressData.totalDistanceKm),
+                            color = textColor,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
 
-                    Spacer(modifier = Modifier.height(70.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                    Text(
-                        text = String.format(Locale.US, "%.2f KM", progressData.totalDistanceKm),
-                        color = textColor,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                        Text(
+                            text = progressData.totalTimeSeconds.toReadableDuration(),
+                            color = textColor,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                    Text(
-                        text = progressData.totalTimeSeconds.toReadableDuration(),
-                        color = textColor,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = "SESSIONS: ${progressData.totalSessions}",
-                        color = textColor,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                        Text(
+                            text = "SESSIONS: ${progressData.totalSessions}",
+                            color = textColor,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -347,14 +337,14 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
         val parts = raw.split("|")
         when (parts.size) {
             4 -> SavedSession(
-                date        = parts[0],
-                distanceKm  = parts[1].toFloatOrNull() ?: 0f,
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
                 timeSeconds = parts[2].toIntOrNull() ?: 0,
-                mode        = parts[3]
+                mode = parts[3]
             )
             3 -> SavedSession(
-                date        = parts[0],
-                distanceKm  = parts[1].toFloatOrNull() ?: 0f,
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
                 timeSeconds = parts[2].toIntOrNull() ?: 0
             )
             else -> null
@@ -388,19 +378,6 @@ private fun calculateProgressForPeriod(
         totalTimeSeconds = filteredSessions.sumOf { it.timeSeconds },
         totalSessions = filteredSessions.size
     )
-}
-
-private fun ProgressData.toSpeechText(period: String): String {
-    val periodText = when (period) {
-        "TODAY" -> "Today"
-        "YESTERDAY" -> "Yesterday"
-        "THIS WEEK" -> "This week"
-        "THIS MONTH" -> "This month"
-        "ALL TIME" -> "All time"
-        else -> period.lowercase()
-    }
-
-    return "$periodText, you completed ${String.format(Locale.US, "%.2f", totalDistanceKm)} kilometers in ${totalTimeSeconds.toReadableDurationForSpeech()}. Total sessions: $totalSessions."
 }
 
 private fun Int.toReadableDuration(): String {
