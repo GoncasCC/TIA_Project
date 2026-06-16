@@ -28,7 +28,7 @@ fun TrainingSession(
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
-    val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
+    val backgroundColor = Color.Black
 
     val isDistanceGoal = goalType == "DISTANCE"
     val targetDistanceMeters = remember(goalValue) { goalValue.extractNumber() * 1000f }

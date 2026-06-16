@@ -306,7 +306,7 @@ private fun OptionsLayout(
 
             Text(
                 text = if (currentValue) "ON" else "OFF",
-                color = if (currentValue) Color(0xFF00C853) else Color(0xFFD50000),
+                color = if (currentValue) Color(0xFF2196F3) else Color(0xFF9C27B0),
                 fontSize = 86.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center

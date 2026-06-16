@@ -37,7 +37,7 @@ fun ProgressScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val greenColor = Color(0xFF00C853)
+    val blueColor = Color(0xFF2196F3)
 
     val periods = listOf("PERSONAL BEST", "TODAY", "YESTERDAY", "THIS WEEK", "THIS MONTH", "ALL TIME")
 
@@ -201,7 +201,7 @@ fun ProgressScreen(
         ) {
             Text(
                 text = "PROGRESS",
-                color = greenColor,
+                color = blueColor,
                 fontSize = 66.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -220,7 +220,7 @@ fun ProgressScreen(
                 if (selectedPeriod == "PERSONAL BEST") {
                     Text(
                         text = "PERSONAL BEST",
-                        color = greenColor,
+                        color = blueColor,
                         fontSize = 42.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -231,7 +231,7 @@ fun ProgressScreen(
 
                     Text(
                         text = "1 MIN MODE",
-                        color = greenColor,
+                        color = blueColor,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -251,7 +251,7 @@ fun ProgressScreen(
 
                     Text(
                         text = "5 MIN MODE",
-                        color = greenColor,
+                        color = blueColor,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -271,7 +271,7 @@ fun ProgressScreen(
 
                     Text(
                         text = "1 KM MODE",
-                        color = greenColor,
+                        color = blueColor,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -288,7 +288,7 @@ fun ProgressScreen(
                 } else {
                     Text(
                         text = selectedPeriod,
-                        color = greenColor,
+                        color = blueColor,
                         fontSize = 52.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,

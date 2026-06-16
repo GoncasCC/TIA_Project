@@ -326,12 +326,7 @@ private fun GuideTrainingLayout(
         else -> cardColor
     }
 
-    val currentCardTextColor = when (step) {
-        GuideStep.EASYMODE,
-        GuideStep.MEDIUMMODE,
-        GuideStep.HARDMODE -> Color.White
-        else -> cardTextColor
-    }
+    val currentCardTextColor = cardTextColor
 
     Box(
         modifier = Modifier

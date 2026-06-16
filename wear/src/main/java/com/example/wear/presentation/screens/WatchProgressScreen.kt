@@ -161,7 +161,7 @@ fun WatchProgressScreen(
         if (askingToEnd) {
             Text(
                 text = "FINISH?",
-                color = Color(0xFFD50000),
+                color = Color(0xFF9C27B0),
                 fontSize = 60.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,

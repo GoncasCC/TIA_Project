@@ -841,7 +841,7 @@ fun SummaryScreen(
                     modifier = Modifier
                         .size(300.dp)
                         .background(
-                            Color.Green,
+                            Color(0xFF2196F3),
                             shape = androidx.compose.foundation.shape.CircleShape
                         )
                 )
