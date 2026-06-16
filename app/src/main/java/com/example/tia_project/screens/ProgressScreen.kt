@@ -37,7 +37,7 @@ fun ProgressScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val blueColor = Color(0xFF2196F3)
+    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
 
     val periods = listOf("PERSONAL BEST", "TODAY", "YESTERDAY", "THIS WEEK", "THIS MONTH", "ALL TIME")
 
@@ -48,7 +48,6 @@ fun ProgressScreen(
     val progressData = remember(selectedPeriod, sessions) {
         calculateProgressForPeriod(selectedPeriod, sessions)
     }
-
 
     val pb1Min = remember(sessions) {
         sessions.filter { it.mode == "1 MIN" }.maxByOrNull { it.distanceKm }
@@ -201,7 +200,7 @@ fun ProgressScreen(
         ) {
             Text(
                 text = "PROGRESS",
-                color = blueColor,
+                color = textColor,
                 fontSize = 66.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -220,7 +219,7 @@ fun ProgressScreen(
                 if (selectedPeriod == "PERSONAL BEST") {
                     Text(
                         text = "PERSONAL BEST",
-                        color = blueColor,
+                        color = accentColor,
                         fontSize = 42.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -228,10 +227,9 @@ fun ProgressScreen(
 
                     Spacer(modifier = Modifier.height(40.dp))
 
-
                     Text(
                         text = "1 MIN MODE",
-                        color = blueColor,
+                        color = accentColor,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -248,10 +246,9 @@ fun ProgressScreen(
 
                     Spacer(modifier = Modifier.height(28.dp))
 
-
                     Text(
                         text = "5 MIN MODE",
-                        color = blueColor,
+                        color = accentColor,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -268,10 +265,9 @@ fun ProgressScreen(
 
                     Spacer(modifier = Modifier.height(28.dp))
 
-
                     Text(
                         text = "1 KM MODE",
-                        color = blueColor,
+                        color = accentColor,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -288,7 +284,7 @@ fun ProgressScreen(
                 } else {
                     Text(
                         text = selectedPeriod,
-                        color = blueColor,
+                        color = accentColor,
                         fontSize = 52.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,

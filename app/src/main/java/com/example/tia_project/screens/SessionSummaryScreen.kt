@@ -35,7 +35,7 @@ fun SessionSummaryScreen(
     val context = LocalContext.current
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val accentColor = Color(0xFF2196F3)
+    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
 
     val minutes = timeSeconds / 60
     val distanceStr = String.format(Locale.US, "%.2f", distanceKm)

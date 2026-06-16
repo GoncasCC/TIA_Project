@@ -320,10 +320,8 @@ private fun GuideTrainingLayout(
         GuideStep.FINISHED -> "guide completed"
     }
 
-    // Detetamos se o Dark Mode está ativo (no Dark Mode, o texto base é branco)
     val isDarkMode = textColor == Color.White
 
-    // --- LÓGICA DO FUNDO DO CARTÃO ---
     val currentCardColor = when (step) {
         GuideStep.EASYMODE   -> if (isDarkMode) Color.White else Color(0xFF2196F3)
         GuideStep.MEDIUMMODE -> if (isDarkMode) Color.White else Color(0xFFFF9800)
@@ -331,7 +329,6 @@ private fun GuideTrainingLayout(
         else -> cardColor
     }
 
-    // --- LÓGICA DA COR DAS LETRAS ---
     val currentCardTextColor = when (step) {
         GuideStep.EASYMODE   -> if (isDarkMode) Color(0xFF2196F3) else Color.White
         GuideStep.MEDIUMMODE -> if (isDarkMode) Color(0xFFFF9800) else Color.White
@@ -344,7 +341,6 @@ private fun GuideTrainingLayout(
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 40.dp)
     ) {
-        // "GUIDE" mantém-se sempre fixo no topo independentemente do ecrã
         Text(
             text = "GUIDE",
             color = textColor,
@@ -356,12 +352,11 @@ private fun GuideTrainingLayout(
                 .align(Alignment.TopCenter)
         )
 
-        // Se estivermos no fim, mostramos apenas "DONE" gigante
         if (step == GuideStep.FINISHED) {
             Text(
                 text = "DONE",
                 color = accentColor,
-                fontSize = 100.sp, // Letra gigante
+                fontSize = 100.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -369,7 +364,6 @@ private fun GuideTrainingLayout(
                     .align(Alignment.Center)
             )
         } else {
-            // Caso contrário, mostra o cartão e a vibração em baixo
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally

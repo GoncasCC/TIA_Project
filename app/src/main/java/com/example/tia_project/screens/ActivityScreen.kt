@@ -649,6 +649,9 @@ fun SummaryScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val safetyColor = Color(0xFFFFCC00)
+
+    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
+
     val difficultyColor = when (difficulty) {
         "JUST VIBING" -> Color(0xFF2196F3)
         "STARTING TO SWEAT" -> Color(0xFFFF9800)
@@ -841,7 +844,7 @@ fun SummaryScreen(
                     modifier = Modifier
                         .size(300.dp)
                         .background(
-                            Color(0xFF2196F3),
+                            accentColor,
                             shape = androidx.compose.foundation.shape.CircleShape
                         )
                 )
