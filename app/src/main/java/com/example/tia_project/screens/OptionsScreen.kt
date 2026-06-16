@@ -51,7 +51,7 @@ fun OptionsScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val cardColor = if (darkModeEnabled) Color.White else Color(0xFFD90000)
+    val cardColor = if (darkModeEnabled) Color.White else Color(0xFF333333)
     val cardTextColor = if (darkModeEnabled) Color.Black else Color.White
 
     val currentValue = when (selectedOption) {

@@ -53,8 +53,8 @@ fun GuideScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFD90000)
-    val cardColor = if (darkModeEnabled) Color.White else Color(0xFFD90000)
+    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
+    val cardColor = if (darkModeEnabled) Color.White else Color(0xFF333333)
     val cardTextColor = if (darkModeEnabled) Color.Black else Color.White
 
     val vibrator = remember(context) {
@@ -319,20 +319,32 @@ private fun GuideTrainingLayout(
         GuideStep.HARDMODE -> ""
         GuideStep.FINISHED -> "guide completed"
     }
+
+    // Detetamos se o Dark Mode está ativo (no Dark Mode, o texto base é branco)
+    val isDarkMode = textColor == Color.White
+
+    // --- LÓGICA DO FUNDO DO CARTÃO ---
     val currentCardColor = when (step) {
-        GuideStep.EASYMODE -> Color(0xFF2196F3)
-        GuideStep.MEDIUMMODE -> Color(0xFFFF9800)
-        GuideStep.HARDMODE -> Color(0xFF9C27B0)
+        GuideStep.EASYMODE   -> if (isDarkMode) Color.White else Color(0xFF2196F3)
+        GuideStep.MEDIUMMODE -> if (isDarkMode) Color.White else Color(0xFFFF9800)
+        GuideStep.HARDMODE   -> if (isDarkMode) Color.White else Color(0xFF9C27B0)
         else -> cardColor
     }
 
-    val currentCardTextColor = cardTextColor
+    // --- LÓGICA DA COR DAS LETRAS ---
+    val currentCardTextColor = when (step) {
+        GuideStep.EASYMODE   -> if (isDarkMode) Color(0xFF2196F3) else Color.White
+        GuideStep.MEDIUMMODE -> if (isDarkMode) Color(0xFFFF9800) else Color.White
+        GuideStep.HARDMODE   -> if (isDarkMode) Color(0xFF9C27B0) else Color.White
+        else -> cardTextColor
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 40.dp)
     ) {
+        // "GUIDE" mantém-se sempre fixo no topo independentemente do ecrã
         Text(
             text = "GUIDE",
             color = textColor,
@@ -344,35 +356,50 @@ private fun GuideTrainingLayout(
                 .align(Alignment.TopCenter)
         )
 
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
+        // Se estivermos no fim, mostramos apenas "DONE" gigante
+        if (step == GuideStep.FINISHED) {
+            Text(
+                text = "DONE",
+                color = accentColor,
+                fontSize = 100.sp, // Letra gigante
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
-                    .background(currentCardColor, RoundedCornerShape(24.dp)),
-                contentAlignment = Alignment.Center
+                    .align(Alignment.Center)
+            )
+        } else {
+            // Caso contrário, mostra o cartão e a vibração em baixo
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .background(currentCardColor, RoundedCornerShape(24.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = instruction,
+                        color = currentCardTextColor,
+                        fontSize = if (instruction.length > 12) 42.sp else 58.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(60.dp))
+
                 Text(
-                    text = instruction,
-                    color = currentCardTextColor,
-                    fontSize = if (instruction.length > 12) 42.sp else 58.sp,
+                    text = vibration.uppercase(),
+                    color = accentColor,
+                    fontSize = 38.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
             }
-
-            Spacer(modifier = Modifier.height(60.dp))
-
-            Text(
-                text = vibration.uppercase(),
-                color = accentColor,
-                fontSize = 38.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
