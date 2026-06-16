@@ -49,8 +49,15 @@ fun ProgressScreen(
         calculateProgressForPeriod(selectedPeriod, sessions)
     }
 
-    val personalBest = remember(sessions) {
-        sessions.maxByOrNull { it.distanceKm }
+
+    val pb1Min = remember(sessions) {
+        sessions.filter { it.mode == "1 MIN" }.maxByOrNull { it.distanceKm }
+    }
+    val pb5Min = remember(sessions) {
+        sessions.filter { it.mode == "5 MIN" }.maxByOrNull { it.distanceKm }
+    }
+    val pb1Km = remember(sessions) {
+        sessions.filter { it.mode == "1 KM" && it.timeSeconds > 0 }.minByOrNull { it.timeSeconds }
     }
 
     val vibrator = remember(context) {
@@ -81,7 +88,7 @@ fun ProgressScreen(
 
     fun speak(text: String, id: String) {
         if (isTtsReady && voiceoverEnabled) {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+            tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
         }
     }
 
@@ -103,16 +110,31 @@ fun ProgressScreen(
 
     LaunchedEffect(selectedPeriod, isTtsReady, voiceoverEnabled) {
         if (!isGoingBack) {
-            val speechText = if (selectedPeriod == "PERSONAL BEST") {
-                if (personalBest != null) {
-                    "Personal best: ${String.format(Locale.US, "%.2f", personalBest.distanceKm)} kilometers in ${personalBest.timeSeconds.toReadableDurationForSpeech()}."
-                } else {
-                    "Personal best. No personal best yet."
-                }
+            if (selectedPeriod == "PERSONAL BEST") {
+                tts?.speak("Personal best.", TextToSpeech.QUEUE_FLUSH, null, "pb_header")
+                tts?.speak(
+                    if (pb1Min != null)
+                        "1 minute mode: ${String.format(Locale.US, "%.2f", pb1Min.distanceKm)} kilometers"
+                    else "1 minute mode: no record yet",
+                    TextToSpeech.QUEUE_ADD, null, "pb_1min"
+                )
+                tts?.speak(
+                    if (pb5Min != null)
+                        "5 minutes mode: ${String.format(Locale.US, "%.2f", pb5Min.distanceKm)} kilometers"
+                    else "5 minutes mode: no record yet",
+                    TextToSpeech.QUEUE_ADD, null, "pb_5min"
+                )
+                tts?.speak(
+                    if (pb1Km != null) {
+                        val mins = pb1Km.timeSeconds / 60
+                        val secs = pb1Km.timeSeconds % 60
+                        "1 kilometer mode: $mins minutes and $secs seconds"
+                    } else "1 kilometer mode: no record yet",
+                    TextToSpeech.QUEUE_ADD, null, "pb_1km"
+                )
             } else {
-                progressData.toSpeechText(selectedPeriod)
+                speak(progressData.toSpeechText(selectedPeriod), "progress_${selectedPeriod.lowercase().replace(" ", "_")}")
             }
-            speak(speechText, "progress_${selectedPeriod.lowercase().replace(" ", "_")}")
         }
     }
 
@@ -154,7 +176,7 @@ fun ProgressScreen(
                                     if (horizontalMove > 80f || horizontalMove < -80f) {
                                         isGoingBack = true
                                         vibrateNormal()
-                                        speak("Going back to menu.", "progress_back_menu")
+                                        tts?.speak("Going back to menu.", TextToSpeech.QUEUE_FLUSH, null, "progress_back_menu")
 
                                         launch {
                                             while (tts?.isSpeaking == true) {
@@ -204,35 +226,65 @@ fun ProgressScreen(
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(70.dp))
+                    Spacer(modifier = Modifier.height(40.dp))
 
-                    if (personalBest != null) {
-                        Text(
-                            text = String.format(Locale.US, "%.2f KM", personalBest.distanceKm),
-                            color = textColor,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "1 MIN MODE",
+                        color = greenColor,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (pb1Min != null)
+                            String.format(Locale.US, "%.2f KM", pb1Min.distanceKm)
+                        else "---",
+                        color = textColor,
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
 
-                        Text(
-                            text = personalBest.timeSeconds.toReadableDuration(),
-                            color = textColor,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        Text(
-                            text = "NO PERSONAL\nBEST YET",
-                            color = textColor,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(28.dp))
+
+
+                    Text(
+                        text = "5 MIN MODE",
+                        color = greenColor,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (pb5Min != null)
+                            String.format(Locale.US, "%.2f KM", pb5Min.distanceKm)
+                        else "---",
+                        color = textColor,
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(28.dp))
+
+
+                    Text(
+                        text = "1 KM MODE",
+                        color = greenColor,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (pb1Km != null)
+                            pb1Km.timeSeconds.toReadableDuration()
+                        else "---",
+                        color = textColor,
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
                 } else {
                     Text(
                         text = selectedPeriod,
@@ -281,7 +333,8 @@ fun ProgressScreen(
 data class SavedSession(
     val date: String,
     val distanceKm: Float,
-    val timeSeconds: Int
+    val timeSeconds: Int,
+    val mode: String = ""
 )
 
 data class ProgressData(
@@ -296,15 +349,19 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
 
     return rawSessions.mapNotNull { raw ->
         val parts = raw.split("|")
-
-        if (parts.size == 3) {
-            SavedSession(
-                date = parts[0],
-                distanceKm = parts[1].toFloatOrNull() ?: 0f,
+        when (parts.size) {
+            4 -> SavedSession(
+                date        = parts[0],
+                distanceKm  = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0,
+                mode        = parts[3]
+            )
+            3 -> SavedSession(
+                date        = parts[0],
+                distanceKm  = parts[1].toFloatOrNull() ?: 0f,
                 timeSeconds = parts[2].toIntOrNull() ?: 0
             )
-        } else {
-            null
+            else -> null
         }
     }
 }

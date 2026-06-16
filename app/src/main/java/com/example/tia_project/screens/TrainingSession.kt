@@ -49,10 +49,25 @@ fun TrainingSession(
     val isStartingToSweat = difficulty == "STARTING TO SWEAT"
     val isPushingLimits = difficulty == "PUSHING LIMITS"
 
+    var tts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
+    var isTtsReady by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        val textToSpeech = android.speech.tts.TextToSpeech(context) { status ->
+            if (status == android.speech.tts.TextToSpeech.SUCCESS) isTtsReady = true
+        }
+        tts = textToSpeech
+        textToSpeech.language = java.util.Locale.US
+        onDispose {
+            textToSpeech.stop()
+            textToSpeech.shutdown()
+        }
+    }
+
     LaunchedEffect(Unit) {
         WatchDataRepository.clearSessionState()
 
-        val personalBest = getPersonalBestSession(context)
+        val personalBest = getPersonalBestForMode(context, goalType, goalValue)
         sendMessageToWatch(
             context, "/session_start", mapOf(
                 "goalType"                to goalType,
@@ -66,6 +81,26 @@ fun TrainingSession(
                 "personalBestTimeSeconds" to (personalBest?.timeSeconds ?: 0)
             )
         )
+
+        if (isPushingLimits && voiceoverEnabled && personalBest != null) {
+
+            var waited = 0
+            while (!isTtsReady && waited < 3000) {
+                delay(100)
+                waited += 100
+            }
+            val pbText = if (goalType == "DISTANCE") {
+                val mins = personalBest.timeSeconds / 60
+                val secs = personalBest.timeSeconds % 60
+                "Your personal best for 1 kilometer is ${mins} minutes and ${secs} seconds. Let's try to beat it!"
+            } else {
+                val km = String.format(java.util.Locale.US, "%.2f", personalBest.distanceKm)
+                val modeLabel = if (goalValue.extractNumber() == 1) "1 minute" else "${goalValue.extractNumber()} minutes"
+                "Your personal best for $modeLabel is $km kilometers. Let's try to beat it!"
+            }
+            tts?.speak(pbText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "pb_announce")
+            delay(4000)
+        }
 
         delay(2500)
         isStarting = false
@@ -176,6 +211,14 @@ fun TrainingSession(
     ) { }
 }
 
+private fun modeKey(goalType: String, goalValue: String): String {
+    return if (goalType == "DISTANCE") {
+        "${goalValue.extractNumber()} KM"
+    } else {
+        "${goalValue.extractNumber()} MIN"
+    }
+}
+
 private fun saveTrainingSession(
     context: Context,
     activity: String,
@@ -188,21 +231,33 @@ private fun saveTrainingSession(
 ) {
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
     val oldSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
-    val newSession = "${System.currentTimeMillis()}|${distanceMeters / 1000f}|$elapsedSeconds"
+    val mode = modeKey(goalType, goalValue)
+    val newSession = "${System.currentTimeMillis()}|${distanceMeters / 1000f}|$elapsedSeconds|$mode"
     prefs.edit().putStringSet("sessions", oldSessions + newSession).apply()
 }
 
-private fun getPersonalBestSession(context: Context): SavedSession? {
+
+fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String): SavedSession? {
+    val mode = modeKey(goalType, goalValue)
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
     val rawSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
-    return rawSessions.mapNotNull { raw ->
+    val modeSessions = rawSessions.mapNotNull { raw ->
         val parts = raw.split("|")
-        if (parts.size == 3) SavedSession(
-            date          = parts[0],
-            distanceKm    = parts[1].toFloatOrNull() ?: 0f,
-            timeSeconds   = parts[2].toIntOrNull() ?: 0
-        ) else null
-    }.maxByOrNull { it.distanceKm }
+        when {
+            parts.size == 4 && parts[3] == mode -> SavedSession(
+                date        = parts[0],
+                distanceKm  = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0,
+                mode        = parts[3]
+            )
+            else -> null
+        }
+    }
+    return if (goalType == "DISTANCE") {
+        modeSessions.filter { it.timeSeconds > 0 }.minByOrNull { it.timeSeconds }
+    } else {
+        modeSessions.maxByOrNull { it.distanceKm }
+    }
 }
 
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
