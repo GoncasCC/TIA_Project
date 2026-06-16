@@ -135,6 +135,7 @@ private fun OptionSelectionScreen(
     var selectedIndex by remember { mutableStateOf(0) }
     var dragAmountTotal by remember { mutableStateOf(0f) }
     var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
+    var isNavigating by remember { mutableStateOf(false) } // Bloqueio de navegação dupla
 
     val selectedOption = options[selectedIndex]
     val context = LocalContext.current
@@ -210,14 +211,18 @@ private fun OptionSelectionScreen(
                     launch {
                         detectTapGestures(
                             onDoubleTap = {
+                                if (isNavigating) return@detectTapGestures // Bloqueia toques duplos adicionais
+                                isNavigating = true
                                 vibrate(150)
                                 speak("Selected.", "selected")
                                 launch {
-                                    delay(500)
+                                    delay(1200)
                                     onNext(selectedOption)
                                 }
                             },
                             onLongPress = {
+                                if (isNavigating) return@detectTapGestures
+                                isNavigating = true
                                 vibrate(400)
                                 speak("Cancelled. Going back to menu.", "cancelled")
                                 launch {
@@ -244,6 +249,7 @@ private fun OptionSelectionScreen(
                             }
                         ) { change, dragAmount ->
                             change.consume()
+                            if (isNavigating) return@detectHorizontalDragGestures // Impede swipe enquanto navega
                             dragAmountTotal += dragAmount
 
                             if (!hasChangedOptionThisSwipe) {
@@ -277,11 +283,14 @@ private fun OptionSelectionScreen(
                                             .toFloat()
 
                                         if (horizontalMove > 80f || horizontalMove < -80f) {
-                                            vibrate(60)
-                                            speak("Go back.", "go_back")
-                                            launch {
-                                                delay(500)
-                                                onBack()
+                                            if (!isNavigating) {
+                                                isNavigating = true
+                                                vibrate(60)
+                                                speak("Go back.", "go_back")
+                                                launch {
+                                                    delay(1200)
+                                                    onBack()
+                                                }
                                             }
                                         }
                                     }
@@ -424,6 +433,7 @@ fun DifficultyScreen(
     var selectedIndex by remember { mutableStateOf(0) }
     var dragAmountTotal by remember { mutableStateOf(0f) }
     var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
+    var isNavigating by remember { mutableStateOf(false) } // Bloqueio de navegação dupla
 
     val selectedOption = options[selectedIndex]
     val context = LocalContext.current
@@ -495,14 +505,18 @@ fun DifficultyScreen(
                     launch {
                         detectTapGestures(
                             onDoubleTap = {
+                                if (isNavigating) return@detectTapGestures
+                                isNavigating = true
                                 vibrate(150)
                                 speak("Selected.", "selected")
                                 launch {
-                                    delay(500)
+                                    delay(1200)
                                     onNext(selectedOption)
                                 }
                             },
                             onLongPress = {
+                                if (isNavigating) return@detectTapGestures
+                                isNavigating = true
                                 vibrate(400)
                                 speak("Cancelled. Going back to menu.", "cancelled")
                                 launch {
@@ -529,6 +543,7 @@ fun DifficultyScreen(
                             }
                         ) { change, dragAmount ->
                             change.consume()
+                            if (isNavigating) return@detectHorizontalDragGestures
                             dragAmountTotal += dragAmount
 
                             if (!hasChangedOptionThisSwipe) {
@@ -558,11 +573,14 @@ fun DifficultyScreen(
                                         .sumOf { it.positionChange().x.toDouble() }
                                         .toFloat()
                                     if (horizontalMove > 80f || horizontalMove < -80f) {
-                                        vibrate(60)
-                                        speak("Go back.", "go_back")
-                                        launch {
-                                            delay(500)
-                                            onBack()
+                                        if (!isNavigating) {
+                                            isNavigating = true
+                                            vibrate(60)
+                                            speak("Go back.", "go_back")
+                                            launch {
+                                                delay(1200)
+                                                onBack()
+                                            }
                                         }
                                     }
                                 }
@@ -753,9 +771,12 @@ fun SummaryScreen(
                         }
                     },
                     onLongPress = {
-                        vibrate(400)
-                        speak("Cancelled.", "cancelled_summary")
-                        onCancel()
+                        if (!confirmed) { // Proteção extra também no cancelar
+                            confirmed = true
+                            vibrate(400)
+                            speak("Cancelled.", "cancelled_summary")
+                            onCancel()
+                        }
                     }
                 )
             },
