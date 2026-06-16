@@ -36,7 +36,8 @@ fun WatchProgressScreen(
     onPauseToggle: () -> Unit = {},
     onResume: () -> Unit = {},
     onEndSession: () -> Unit = {},
-    onSpeakRequest: (String) -> Unit = {}
+    onSpeakRequest: (String) -> Unit = {},
+    onStopSpeaking: () -> Unit = {}
 ) {
     var askingToEnd by remember { mutableStateOf(false) }
     var wasPausedBeforeAsking by remember { mutableStateOf(false) }
@@ -94,6 +95,7 @@ fun WatchProgressScreen(
                         launch {
                             detectTapGestures(
                                 onTap = {
+                                    onStopSpeaking()
                                     askingToEnd = false
                                     if (!wasPausedBeforeAsking) {
                                         localPaused = false
@@ -101,6 +103,7 @@ fun WatchProgressScreen(
                                     }
                                 },
                                 onDoubleTap = {
+                                    onStopSpeaking()
                                     if (vibrationEnabled) {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                             vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))

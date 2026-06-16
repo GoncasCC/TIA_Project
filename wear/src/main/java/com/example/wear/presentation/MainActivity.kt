@@ -131,7 +131,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         )
                         WearSessionRepository.setSessionActive(false)
                     },
-                    onSpeakRequest = { text -> speak(text) }
+                    onSpeakRequest = { text -> speak(text) },
+                    onStopSpeaking = { tts?.stop() }
                 )
             }
         }
