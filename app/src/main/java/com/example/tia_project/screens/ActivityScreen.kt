@@ -194,7 +194,7 @@ private fun OptionSelectionScreen(
     }
 
     LaunchedEffect(screenKey, selectedOption, isTtsReady, voiceoverEnabled) {
-        delay(600)
+        delay(100)
         speak(
             speechForOption(selectedOption),
             "option_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
@@ -489,7 +489,7 @@ fun DifficultyScreen(
     }
 
     LaunchedEffect(selectedOption, isTtsReady, voiceoverEnabled) {
-        delay(600)
+        delay(100)
         speak(
             "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
             "difficulty_$selectedOption"
@@ -728,7 +728,7 @@ fun SummaryScreen(
     }
 
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
-        delay(600)
+        delay(100)
         if (isTtsReady && voiceoverEnabled) {
             tts?.speak(
                 "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
