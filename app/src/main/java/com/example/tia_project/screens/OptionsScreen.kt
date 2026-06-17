@@ -251,7 +251,8 @@ fun OptionsScreen(
             backgroundColor = backgroundColor,
             textColor = textColor,
             cardColor = cardColor,
-            cardTextColor = cardTextColor
+            cardTextColor = cardTextColor,
+            darkModeEnabled = darkModeEnabled
         )
     }
 }
@@ -263,7 +264,8 @@ private fun OptionsLayout(
     backgroundColor: Color,
     textColor: Color,
     cardColor: Color,
-    cardTextColor: Color
+    cardTextColor: Color,
+    darkModeEnabled: Boolean
 ) {
     Box(
         modifier = Modifier
@@ -306,7 +308,9 @@ private fun OptionsLayout(
 
             Text(
                 text = if (currentValue) "ON" else "OFF",
-                color = if (currentValue) Color(0xFF2196F3) else Color(0xFF9C27B0),
+                color = if (currentValue)
+                    if (darkModeEnabled) Color(0xFF2196F3) else Color(0xFF1565C0)
+                else Color(0xFF9C27B0),
                 fontSize = 86.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center

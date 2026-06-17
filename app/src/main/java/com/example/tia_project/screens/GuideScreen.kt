@@ -53,7 +53,7 @@ fun GuideScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
-    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
+    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
     val cardColor = if (darkModeEnabled) Color.White else Color(0xFF333333)
     val cardTextColor = if (darkModeEnabled) Color.Black else Color.White
 
@@ -323,8 +323,8 @@ private fun GuideTrainingLayout(
     val isDarkMode = textColor == Color.White
 
     val currentCardColor = when (step) {
-        GuideStep.EASYMODE   -> if (isDarkMode) Color.White else Color(0xFF2196F3)
-        GuideStep.MEDIUMMODE -> if (isDarkMode) Color.White else Color(0xFFFF9800)
+        GuideStep.EASYMODE   -> if (isDarkMode) Color.White else Color(0xFF1565C0)
+        GuideStep.MEDIUMMODE -> if (isDarkMode) Color.White else Color(0xFFB25F00)
         GuideStep.HARDMODE   -> if (isDarkMode) Color.White else Color(0xFF9C27B0)
         else -> cardColor
     }

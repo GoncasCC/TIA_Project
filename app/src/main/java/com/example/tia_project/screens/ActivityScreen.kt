@@ -424,11 +424,19 @@ fun DifficultyScreen(
     onCancel: () -> Unit
 ) {
     val options = listOf("JUST VIBING", "STARTING TO SWEAT", "PUSHING LIMITS")
-    val colorForOption = mapOf(
-        "JUST VIBING" to Color(0xFF2196F3),
-        "STARTING TO SWEAT" to Color(0xFFFF9800),
-        "PUSHING LIMITS" to Color(0xFF9C27B0)
-    )
+    val colorForOption = if (darkModeEnabled) {
+        mapOf(
+            "JUST VIBING" to Color(0xFF2196F3),
+            "STARTING TO SWEAT" to Color(0xFFFF9800),
+            "PUSHING LIMITS" to Color(0xFF9C27B0)
+        )
+    } else {
+        mapOf(
+            "JUST VIBING" to Color(0xFF1565C0),
+            "STARTING TO SWEAT" to Color(0xFFB25F00),
+            "PUSHING LIMITS" to Color(0xFF9C27B0)
+        )
+    }
 
     var selectedIndex by remember { mutableStateOf(0) }
     var dragAmountTotal by remember { mutableStateOf(0f) }
@@ -668,13 +676,22 @@ fun SummaryScreen(
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val safetyColor = Color(0xFFFFCC00)
 
-    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFE91E63)
+    val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
 
-    val difficultyColor = when (difficulty) {
-        "JUST VIBING" -> Color(0xFF2196F3)
-        "STARTING TO SWEAT" -> Color(0xFFFF9800)
-        "PUSHING LIMITS" -> Color(0xFF9C27B0)
-        else -> if (darkModeEnabled) Color.White else Color.Black
+    val difficultyColor = if (darkModeEnabled) {
+        when (difficulty) {
+            "JUST VIBING" -> Color(0xFF2196F3)
+            "STARTING TO SWEAT" -> Color(0xFFFF9800)
+            "PUSHING LIMITS" -> Color(0xFF9C27B0)
+            else -> Color.White
+        }
+    } else {
+        when (difficulty) {
+            "JUST VIBING" -> Color(0xFF1565C0)
+            "STARTING TO SWEAT" -> Color(0xFFB25F00)
+            "PUSHING LIMITS" -> Color(0xFF9C27B0)
+            else -> Color.Black
+        }
     }
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
