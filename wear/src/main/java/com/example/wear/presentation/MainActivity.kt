@@ -116,8 +116,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     onResume = {
                         WearSessionRepository.update(session.copy(paused = false))
                         sendCommandToPhone("resume")
+                        speak("Returning to session.")
                     },
                     onEndSession = {
+                        speak("Finishing session.")
                         sendSessionResult(
                             distanceMeters = sessionSteps * 0.7f,
                             elapsedSeconds = if (WearSessionRepository.session.value.goalType == "TIME") {

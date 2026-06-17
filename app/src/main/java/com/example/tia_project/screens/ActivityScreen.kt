@@ -195,10 +195,12 @@ private fun OptionSelectionScreen(
 
     LaunchedEffect(screenKey, selectedOption, isTtsReady, voiceoverEnabled) {
         delay(100)
-        speak(
-            speechForOption(selectedOption),
-            "option_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
-        )
+        if (!isNavigating) {
+            speak(
+                speechForOption(selectedOption),
+                "option_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
+            )
+        }
     }
 
     Box(
@@ -498,10 +500,12 @@ fun DifficultyScreen(
 
     LaunchedEffect(selectedOption, isTtsReady, voiceoverEnabled) {
         delay(100)
-        speak(
-            "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
-            "difficulty_$selectedOption"
-        )
+        if (!isNavigating) {
+            speak(
+                "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
+                "difficulty_$selectedOption"
+            )
+        }
     }
 
     Box(
@@ -746,24 +750,31 @@ fun SummaryScreen(
 
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
         delay(100)
-        if (isTtsReady && voiceoverEnabled) {
+        if (isTtsReady && voiceoverEnabled && !confirmed) {
             tts?.speak(
                 "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 "summary1"
             )
-            while (tts?.isSpeaking == true) {
+
+            while (tts?.isSpeaking == true && !confirmed) {
                 delay(100)
             }
-            delay(300)
-            tts?.speak(
-                "Double tap to confirm you are in a safe, obstacle-free environment.",
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "summary2"
-            )
-            showTriangle = true
+
+            if (!confirmed) {
+                delay(300)
+            }
+
+            if (!confirmed) {
+                tts?.speak(
+                    "Double tap to confirm you are in a safe, obstacle-free environment.",
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "summary2"
+                )
+                showTriangle = true
+            }
         }
     }
 
