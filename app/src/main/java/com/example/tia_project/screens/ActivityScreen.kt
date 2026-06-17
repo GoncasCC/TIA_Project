@@ -356,7 +356,7 @@ private fun IconOptionLayout(
 
         Image(
             painter = painterResource(id = imageRes),
-            contentDescription = selectedOption,
+            contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
@@ -374,6 +374,7 @@ private fun GoalValueLayout(
 ) {
     val isOne = selectedOption.startsWith("1")
     val unit = selectedOption.substringAfter(" ")
+    val number = selectedOption.substringBefore(" ")
 
     val numberImage = if (isOne) {
         if (darkModeEnabled) R.drawable.one_darkmodeicon else R.drawable.one_lightmodeicon
@@ -393,7 +394,7 @@ private fun GoalValueLayout(
 
         Image(
             painter = painterResource(id = numberImage),
-            contentDescription = selectedOption,
+            contentDescription = number,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
