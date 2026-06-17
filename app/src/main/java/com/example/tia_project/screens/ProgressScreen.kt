@@ -60,14 +60,14 @@ fun ProgressScreen(
     val pages: List<Page> = listOf(
         Page.PBMode(
             label = "1 MIN MODE",
-            value = if (pb1Min != null) String.format(Locale.US, "%.2f KM", pb1Min.distanceKm) else "---",
-            speech = if (pb1Min != null) "Personal best, 1 minute mode: ${String.format(Locale.US, "%.2f", pb1Min.distanceKm)} kilometers"
+            value = if (pb1Min != null) pb1Min.distanceKm.toSignificantKm() else "---",
+            speech = if (pb1Min != null) "Personal best, 1 minute mode: ${pb1Min.distanceKm.toSignificantKmSpeech()} kilometers"
             else "Personal best, 1 minute mode: no record yet"
         ),
         Page.PBMode(
             label = "5 MIN MODE",
-            value = if (pb5Min != null) String.format(Locale.US, "%.2f KM", pb5Min.distanceKm) else "---",
-            speech = if (pb5Min != null) "Personal best, 5 minutes mode: ${String.format(Locale.US, "%.2f", pb5Min.distanceKm)} kilometers"
+            value = if (pb5Min != null) pb5Min.distanceKm.toSignificantKm() else "---",
+            speech = if (pb5Min != null) "Personal best, 5 minutes mode: ${pb5Min.distanceKm.toSignificantKmSpeech()} kilometers"
             else "Personal best, 5 minutes mode: no record yet"
         ),
         Page.PBMode(
@@ -150,7 +150,7 @@ fun ProgressScreen(
                     "ALL TIME" -> "All time"
                     else -> page.period.lowercase()
                 }
-                val speech = "$periodText, you completed ${String.format(Locale.US, "%.2f", progressData.totalDistanceKm)} kilometers " +
+                val speech = "$periodText, you completed ${progressData.totalDistanceKm.toSignificantKmSpeech()} kilometers " +
                         "in ${progressData.totalTimeSeconds.toReadableDurationForSpeech()}. " +
                         "Total sessions: ${progressData.totalSessions}."
                 tts?.speak(speech, TextToSpeech.QUEUE_FLUSH, null, "page_$pageIndex")
@@ -164,10 +164,8 @@ fun ProgressScreen(
             .background(backgroundColor)
             .pointerInput(pageIndex, vibrationEnabled, voiceoverEnabled) {
                 coroutineScope {
-                    // Single handler that tracks all pointers and handles both gestures
                     launch {
                         awaitEachGesture {
-                            // Wait for the first finger down
                             awaitFirstDown(requireUnconsumed = false)
 
                             isTwoFingerGesture = false
@@ -177,7 +175,6 @@ fun ProgressScreen(
                                 val event = awaitPointerEvent()
                                 val pressed = event.changes.filter { it.pressed }
 
-                                // If a second finger joins, mark as two-finger gesture
                                 if (pressed.size >= 2) {
                                     isTwoFingerGesture = true
                                 }
@@ -186,7 +183,6 @@ fun ProgressScreen(
                                 totalDragX += dragX
 
                                 if (isTwoFingerGesture) {
-                                    // Two-finger swipe: go back to menu
                                     if (!isGoingBack && (totalDragX > 80f || totalDragX < -80f)) {
                                         isGoingBack = true
                                         event.changes.forEach { it.consume() }
@@ -202,7 +198,6 @@ fun ProgressScreen(
                                         }
                                     }
                                 } else {
-                                    // Single-finger swipe: change page
                                     if (!isGoingBack) {
                                         if (totalDragX > 25f) {
                                             pageIndex = if (pageIndex == 0) pages.lastIndex else pageIndex - 1
@@ -297,7 +292,7 @@ fun ProgressScreen(
                         Spacer(modifier = Modifier.height(70.dp))
 
                         Text(
-                            text = String.format(Locale.US, "%.2f KM", progressData.totalDistanceKm),
+                            text = progressData.totalDistanceKm.toSignificantKm(),
                             color = textColor,
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
@@ -370,20 +365,33 @@ private fun calculateProgressForPeriod(
     period: String,
     sessions: List<SavedSession>
 ): ProgressData {
-    val now = System.currentTimeMillis()
-    val oneDay = 24 * 60 * 60 * 1000L
+    val cal = java.util.Calendar.getInstance()
+
+    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+    cal.set(java.util.Calendar.MINUTE, 0)
+    cal.set(java.util.Calendar.SECOND, 0)
+    cal.set(java.util.Calendar.MILLISECOND, 0)
+    val startOfToday = cal.timeInMillis
+
+    val startOfYesterday = startOfToday - 24 * 60 * 60 * 1000L
+
+    cal.set(java.util.Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+    val startOfWeek = cal.timeInMillis
+
+    cal.timeInMillis = startOfToday
+    cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+    val startOfMonth = cal.timeInMillis
 
     val filteredSessions = sessions.filter { session ->
         val sessionTime = session.date.toLongOrNull() ?: return@filter false
-        val diff = now - sessionTime
 
         when (period) {
-            "TODAY" -> diff in 0 until oneDay
-            "YESTERDAY" -> diff in oneDay until (2 * oneDay)
-            "THIS WEEK" -> diff in 0 until (7 * oneDay)
-            "THIS MONTH" -> diff in 0 until (30 * oneDay)
-            "ALL TIME" -> true
-            else -> false
+            "TODAY"      -> sessionTime >= startOfToday
+            "YESTERDAY"  -> sessionTime in startOfYesterday until startOfToday
+            "THIS WEEK"  -> sessionTime >= startOfWeek
+            "THIS MONTH" -> sessionTime >= startOfMonth
+            "ALL TIME"   -> true
+            else         -> false
         }
     }
 
@@ -392,6 +400,22 @@ private fun calculateProgressForPeriod(
         totalTimeSeconds = filteredSessions.sumOf { it.timeSeconds },
         totalSessions = filteredSessions.size
     )
+}
+
+private fun Float.toSignificantKm(): String {
+    return when {
+        this >= 100f -> String.format(Locale.US, "%.0f KM", this)
+        this >= 10f  -> String.format(Locale.US, "%.1f KM", this)
+        else         -> String.format(Locale.US, "%.3f KM", this)
+    }
+}
+
+private fun Float.toSignificantKmSpeech(): String {
+    return when {
+        this >= 100f -> String.format(Locale.US, "%.0f", this)
+        this >= 10f  -> String.format(Locale.US, "%.1f", this)
+        else         -> String.format(Locale.US, "%.3f", this)
+    }
 }
 
 private fun Int.toReadableDuration(): String {
