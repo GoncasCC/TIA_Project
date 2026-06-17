@@ -7,7 +7,8 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -118,6 +119,7 @@ fun ProgressScreen(
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
     var isGoingBack by remember { mutableStateOf(false) }
+    var isTwoFingerGesture by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         val textToSpeech = TextToSpeech(context) { status ->
@@ -162,37 +164,32 @@ fun ProgressScreen(
             .background(backgroundColor)
             .pointerInput(pageIndex, vibrationEnabled, voiceoverEnabled) {
                 coroutineScope {
+                    // Single handler that tracks all pointers and handles both gestures
                     launch {
-                        detectHorizontalDragGestures { change, dragAmount ->
-                            change.consume()
+                        awaitEachGesture {
+                            // Wait for the first finger down
+                            awaitFirstDown(requireUnconsumed = false)
 
-                            if (!isGoingBack) {
-                                if (dragAmount > 25f) {
-                                    pageIndex =
-                                        if (pageIndex == 0) pages.lastIndex else pageIndex - 1
-                                    vibrateNormal()
-                                } else if (dragAmount < -25f) {
-                                    pageIndex =
-                                        if (pageIndex == pages.lastIndex) 0 else pageIndex + 1
-                                    vibrateNormal()
-                                }
-                            }
-                        }
-                    }
+                            isTwoFingerGesture = false
+                            var totalDragX = 0f
 
-                    launch {
-                        awaitPointerEventScope {
-                            while (true) {
+                            do {
                                 val event = awaitPointerEvent()
-                                val pressedPointers = event.changes.filter { it.pressed }
+                                val pressed = event.changes.filter { it.pressed }
 
-                                if (pressedPointers.size == 2 && !isGoingBack) {
-                                    val horizontalMove = pressedPointers
-                                        .sumOf { it.positionChange().x.toDouble() }
-                                        .toFloat()
+                                // If a second finger joins, mark as two-finger gesture
+                                if (pressed.size >= 2) {
+                                    isTwoFingerGesture = true
+                                }
 
-                                    if (horizontalMove > 80f || horizontalMove < -80f) {
+                                val dragX = event.changes.sumOf { it.positionChange().x.toDouble() }.toFloat()
+                                totalDragX += dragX
+
+                                if (isTwoFingerGesture) {
+                                    // Two-finger swipe: go back to menu
+                                    if (!isGoingBack && (totalDragX > 80f || totalDragX < -80f)) {
                                         isGoingBack = true
+                                        event.changes.forEach { it.consume() }
                                         vibrateNormal()
                                         tts?.speak("Going back to menu.", TextToSpeech.QUEUE_FLUSH, null, "progress_back_menu")
 
@@ -204,8 +201,25 @@ fun ProgressScreen(
                                             onBack()
                                         }
                                     }
+                                } else {
+                                    // Single-finger swipe: change page
+                                    if (!isGoingBack) {
+                                        if (totalDragX > 25f) {
+                                            pageIndex = if (pageIndex == 0) pages.lastIndex else pageIndex - 1
+                                            vibrateNormal()
+                                            totalDragX = 0f
+                                            event.changes.forEach { it.consume() }
+                                        } else if (totalDragX < -25f) {
+                                            pageIndex = if (pageIndex == pages.lastIndex) 0 else pageIndex + 1
+                                            vibrateNormal()
+                                            totalDragX = 0f
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
                                 }
-                            }
+                            } while (event.changes.any { it.pressed })
+
+                            isTwoFingerGesture = false
                         }
                     }
                 }
