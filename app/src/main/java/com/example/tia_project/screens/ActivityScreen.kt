@@ -194,7 +194,7 @@ private fun OptionSelectionScreen(
     }
 
     LaunchedEffect(screenKey, selectedOption, isTtsReady, voiceoverEnabled) {
-        delay(100)
+        delay(600)
         if (!isNavigating) {
             speak(
                 speechForOption(selectedOption),
@@ -499,7 +499,7 @@ fun DifficultyScreen(
     }
 
     LaunchedEffect(selectedOption, isTtsReady, voiceoverEnabled) {
-        delay(100)
+        delay(600)
         if (!isNavigating) {
             speak(
                 "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
@@ -749,7 +749,7 @@ fun SummaryScreen(
     }
 
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
-        delay(100)
+        delay(600)
         if (isTtsReady && voiceoverEnabled && !confirmed) {
             tts?.speak(
                 "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",

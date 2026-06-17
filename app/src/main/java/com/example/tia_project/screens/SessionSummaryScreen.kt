@@ -38,7 +38,11 @@ fun SessionSummaryScreen(
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
 
     val minutes = timeSeconds / 60
-    val distanceStr = String.format(Locale.US, "%.2f", distanceKm)
+    val distanceStr = when {
+        distanceKm >= 100f -> String.format(Locale.US, "%.0f", distanceKm)
+        distanceKm >= 10f  -> String.format(Locale.US, "%.1f", distanceKm)
+        else               -> String.format(Locale.US, "%.3f", distanceKm)
+    }
 
     val vibrator = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
