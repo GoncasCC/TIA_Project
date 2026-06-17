@@ -701,6 +701,7 @@ fun SummaryScreen(
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
     var confirmed by remember { mutableStateOf(false) }
+    var cancelled by remember { mutableStateOf(false) }
     var showTriangle by remember { mutableStateOf(false) }
 
     val vibrator = remember(context) {
@@ -749,32 +750,32 @@ fun SummaryScreen(
     }
 
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
-        delay(600)
-        if (isTtsReady && voiceoverEnabled && !confirmed) {
+        if (!isTtsReady || !voiceoverEnabled || confirmed || cancelled) return@LaunchedEffect
+        delay(400)
+        if (confirmed || cancelled) return@LaunchedEffect
+        tts?.speak(
+            "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            "summary1"
+        )
+
+        while (tts?.isSpeaking == true && !confirmed && !cancelled) {
+            delay(100)
+        }
+
+        if (!confirmed && !cancelled) {
+            delay(200)
+        }
+
+        if (!confirmed && !cancelled) {
+            showTriangle = true
             tts?.speak(
-                "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
+                "Double tap to confirm you are in a safe, obstacle-free environment.",
                 TextToSpeech.QUEUE_FLUSH,
                 null,
-                "summary1"
+                "summary2"
             )
-
-            while (tts?.isSpeaking == true && !confirmed) {
-                delay(100)
-            }
-
-            if (!confirmed) {
-                delay(300)
-            }
-
-            if (!confirmed) {
-                tts?.speak(
-                    "Double tap to confirm you are in a safe, obstacle-free environment.",
-                    TextToSpeech.QUEUE_FLUSH,
-                    null,
-                    "summary2"
-                )
-                showTriangle = true
-            }
         }
     }
 
@@ -791,27 +792,36 @@ fun SummaryScreen(
             .fillMaxSize()
             .background(backgroundColor)
             .pointerInput(confirmed, vibrationEnabled, voiceoverEnabled) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        if (!confirmed) {
-                            vibrate(150)
-                            confirmed = true
-                        }
-                    },
-                    onLongPress = {
-                        if (!confirmed) {
-                            confirmed = true
-                            vibrate(400)
-                            speak("Cancelled.", "cancelled_summary")
-                            onCancel()
-                        }
+                coroutineScope {
+                    launch {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                if (!confirmed) {
+                                    tts?.stop()
+                                    vibrate(150)
+                                    confirmed = true
+                                }
+                            },
+                            onLongPress = {
+                                if (!confirmed) {
+                                    cancelled = true
+                                    tts?.stop()
+                                    vibrate(400)
+                                    speak("Cancelled.", "cancelled_summary")
+                                    launch {
+                                        delay(1500)
+                                        onCancel()
+                                    }
+                                }
+                            }
+                        )
                     }
-                )
+                }
             },
         contentAlignment = Alignment.Center
     ) {
-        if (!confirmed) {
-            if (!showTriangle) {
+        if (!confirmed || showTriangle) {
+            if (!confirmed && !showTriangle) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -878,7 +888,8 @@ fun SummaryScreen(
                     )
                 }
             }
-        } else {
+        }
+        if (confirmed && !showTriangle) {
             var visible by remember { mutableStateOf(true) }
 
             LaunchedEffect(Unit) {
