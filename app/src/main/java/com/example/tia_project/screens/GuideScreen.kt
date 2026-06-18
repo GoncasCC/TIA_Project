@@ -323,16 +323,16 @@ private fun GuideTrainingLayout(
     val isDarkMode = textColor == Color.White
 
     val currentCardColor = when (step) {
-        GuideStep.EASYMODE   -> if (isDarkMode) Color.White else Color(0xFF1565C0)
-        GuideStep.MEDIUMMODE -> if (isDarkMode) Color.White else Color(0xFFB25F00)
-        GuideStep.HARDMODE   -> if (isDarkMode) Color.White else Color(0xFF9C27B0)
+        GuideStep.EASYMODE   -> if (isDarkMode) Color(0xFF2196F3) else Color(0xFF1565C0)
+        GuideStep.MEDIUMMODE -> if (isDarkMode) Color(0xFFFF9800) else Color(0xFFB25F00)
+        GuideStep.HARDMODE   -> if (isDarkMode) Color(0xFF9C27B0) else Color(0xFF9C27B0)
         else -> cardColor
     }
 
     val currentCardTextColor = when (step) {
-        GuideStep.EASYMODE   -> if (isDarkMode) Color(0xFF2196F3) else Color.White
-        GuideStep.MEDIUMMODE -> if (isDarkMode) Color(0xFFFF9800) else Color.White
-        GuideStep.HARDMODE   -> if (isDarkMode) Color(0xFF9C27B0) else Color.White
+        GuideStep.EASYMODE   -> if (isDarkMode) Color.Black else Color.White
+        GuideStep.MEDIUMMODE -> if (isDarkMode) Color.Black else Color.White
+        GuideStep.HARDMODE   -> if (isDarkMode) Color.Black else Color.White
         else -> cardTextColor
     }
 
@@ -384,15 +384,39 @@ private fun GuideTrainingLayout(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(60.dp))
+                val starCount = when (step) {
+                    GuideStep.EASYMODE -> 1
+                    GuideStep.MEDIUMMODE -> 2
+                    GuideStep.HARDMODE -> 3
+                    else -> 0
+                }
 
-                Text(
-                    text = vibration.uppercase(),
-                    color = accentColor,
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                if (starCount > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        repeat(starCount) {
+                            Text(
+                                text = "\u2605",
+                                color = if (isDarkMode) Color.White else Color(0xFF333333),
+                                fontSize = 100.sp,
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(60.dp))
+
+                    Text(
+                        text = vibration.uppercase(),
+                        color = accentColor,
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

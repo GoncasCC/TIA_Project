@@ -405,7 +405,7 @@ private fun GoalValueLayout(
             text = unit,
             color = textColor,
             fontSize = 55.sp,
-            fontWeight = FontWeight.Normal,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             maxLines = 1,
             modifier = Modifier.fillMaxWidth()
@@ -654,9 +654,9 @@ fun DifficultyScreen(
                     repeat(starCount) {
                         Text(
                             text = "★",
-                            color = Color.White,
-                            fontSize = 64.sp,
-                            modifier = Modifier.padding(horizontal = 6.dp)
+                            color = if (darkModeEnabled) Color.White else Color(0xFF333333),
+                            fontSize = 100.sp,
+                            modifier = Modifier.padding(horizontal = 2.dp)
                         )
                     }
                 }
@@ -679,7 +679,7 @@ fun SummaryScreen(
     val context = LocalContext.current
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
-    val safetyColor = Color(0xFFFFCC00)
+    val safetyColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFF8A6A00)
 
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
 
@@ -872,7 +872,7 @@ fun SummaryScreen(
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 30f)
                     )
                     drawRect(
-                        color = Color.Black,
+                        color = if (darkModeEnabled) Color.Black else Color.White,
                         topLeft = androidx.compose.ui.geometry.Offset(
                             size.width / 2f - 22f,
                             size.height * 0.30f
@@ -880,7 +880,7 @@ fun SummaryScreen(
                         size = androidx.compose.ui.geometry.Size(44f, size.height * 0.38f)
                     )
                     drawCircle(
-                        color = Color.Black,
+                        color = if (darkModeEnabled) Color.Black else Color.White,
                         radius = 26f,
                         center = androidx.compose.ui.geometry.Offset(
                             size.width / 2f,
