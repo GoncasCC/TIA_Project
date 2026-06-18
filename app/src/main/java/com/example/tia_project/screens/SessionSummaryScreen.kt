@@ -8,6 +8,7 @@ import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -85,6 +86,7 @@ fun SessionSummaryScreen(
             .background(backgroundColor)
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onTap = {},
                     onDoubleTap = {
                         if (vibrationEnabled) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

@@ -9,6 +9,7 @@ import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -199,6 +200,7 @@ private fun OptionTextMenuScreen(
                 coroutineScope {
                     launch {
                         detectTapGestures(
+                            onTap = {},
                             onDoubleTap = {
                                 if (isNavigating) return@detectTapGestures
                                 isNavigating = true

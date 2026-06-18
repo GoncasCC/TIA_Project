@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -212,6 +213,7 @@ private fun OptionSelectionScreen(
 
                     launch {
                         detectTapGestures(
+                            onTap = {},
                             onDoubleTap = {
                                 if (isNavigating) return@detectTapGestures
                                 isNavigating = true
@@ -517,6 +519,7 @@ fun DifficultyScreen(
                 coroutineScope {
                     launch {
                         detectTapGestures(
+                            onTap = {},
                             onDoubleTap = {
                                 if (isNavigating) return@detectTapGestures
                                 isNavigating = true
@@ -796,6 +799,7 @@ fun SummaryScreen(
                 coroutineScope {
                     launch {
                         detectTapGestures(
+                            onTap = {},
                             onDoubleTap = {
                                 if (!confirmed) {
                                     tts?.stop()

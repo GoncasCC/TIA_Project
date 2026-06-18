@@ -9,6 +9,7 @@ import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -143,6 +144,7 @@ fun OptionsScreen(
 
                     launch {
                         detectTapGestures(
+                            onTap = {},
                             onDoubleTap = {
                                 if (isGoingBack) return@detectTapGestures
                                 val newValue = !currentValue2
