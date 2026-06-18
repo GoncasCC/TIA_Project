@@ -191,7 +191,7 @@ fun GuideScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(step) {
+            .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -218,7 +218,7 @@ fun GuideScreen(
                     }
                 }
             }
-            .pointerInput(step) {
+            .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = {
                         dragAmountTotal = 0f
@@ -243,7 +243,7 @@ fun GuideScreen(
                     }
                 }
             }
-            .pointerInput(step) {
+            .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {},
                     onDoubleTap = {

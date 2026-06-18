@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -164,7 +165,7 @@ fun ProgressScreen(
             .background(backgroundColor)
             .pointerInput(pageIndex, vibrationEnabled, voiceoverEnabled) {
                 coroutineScope {
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
 

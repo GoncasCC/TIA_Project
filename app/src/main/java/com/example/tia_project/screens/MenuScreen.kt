@@ -16,12 +16,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -196,29 +198,39 @@ private fun OptionTextMenuScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(selectedOption, vibrationEnabled, voiceoverEnabled) {
+            .pointerInput(Unit) {
                 coroutineScope {
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED){
                         detectTapGestures(
-                            onTap = {},
+                            onTap = {
+                                android.util.Log.d(
+                                    "TOUCHDEBUG",
+                                    "onTap"
+                                )
+                            },
                             onDoubleTap = {
+                                android.util.Log.d(
+                                    "TOUCHDEBUG",
+                                    "onDoubleTap"
+                                )
                                 if (isNavigating) return@detectTapGestures
                                 isNavigating = true
+                                val chosen = options[selectedIndex]
                                 vibrate(150)
 
                                 launch {
                                     speakFlush(
-                                        selectSpeechForOption(selectedOption),
-                                        "select_${selectedOption.lowercase().replace(" ", "_")}"
+                                        selectSpeechForOption(chosen),
+                                        "select_${chosen.lowercase().replace(" ", "_")}"
                                     )
                                     waitForSpeechToFinish()
-                                    onNext(selectedOption)
+                                    onNext(chosen)
                                 }
                             }
                         )
                     }
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectHorizontalDragGestures(
                             onDragStart = {
                                 dragAmountTotal = 0f

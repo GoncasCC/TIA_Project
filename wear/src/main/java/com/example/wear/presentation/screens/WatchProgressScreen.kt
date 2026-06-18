@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -92,7 +93,7 @@ fun WatchProgressScreen(
             .pointerInput(askingToEnd, vibrationEnabled, isStopped) {
                 coroutineScope {
                     if (askingToEnd) {
-                        launch {
+                        launch (start = CoroutineStart.UNDISPATCHED) {
                             detectTapGestures(
                                 onTap = {
                                     onStopSpeaking()
@@ -117,11 +118,11 @@ fun WatchProgressScreen(
                                 }
                             )
                         }
-                        launch {
+                        launch (start = CoroutineStart.UNDISPATCHED) {
                             detectHorizontalDragGestures { change, _ -> change.consume() }
                         }
                     } else {
-                        launch {
+                        launch (start = CoroutineStart.UNDISPATCHED) {
                             detectTapGestures(
                                 onDoubleTap = {
                                     if (vibrationEnabled) {

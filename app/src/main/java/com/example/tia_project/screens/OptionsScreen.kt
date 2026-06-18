@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -142,7 +143,7 @@ fun OptionsScreen(
 
                 coroutineScope {
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectTapGestures(
                             onTap = {},
                             onDoubleTap = {
@@ -167,7 +168,7 @@ fun OptionsScreen(
                         )
                     }
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectHorizontalDragGestures(
                             onDragStart = {
                                 dragAmountTotal = 0f
@@ -211,7 +212,7 @@ fun OptionsScreen(
                         }
                     }
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent()

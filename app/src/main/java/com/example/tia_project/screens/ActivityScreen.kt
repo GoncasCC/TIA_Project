@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tia_project.R
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -208,10 +209,10 @@ private fun OptionSelectionScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(selectedOption, onBack, onCancel, vibrationEnabled, voiceoverEnabled) {
+            .pointerInput(Unit) {
                 coroutineScope {
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectTapGestures(
                             onTap = {},
                             onDoubleTap = {
@@ -221,7 +222,7 @@ private fun OptionSelectionScreen(
                                 speak("Selected.", "selected")
                                 launch {
                                     delay(1200)
-                                    onNext(selectedOption)
+                                    onNext(options[selectedIndex])
                                 }
                             },
                             onLongPress = {
@@ -237,7 +238,7 @@ private fun OptionSelectionScreen(
                         )
                     }
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectHorizontalDragGestures(
                             onDragStart = {
                                 dragAmountTotal = 0f
@@ -275,7 +276,7 @@ private fun OptionSelectionScreen(
                     }
 
                     if (onBack != null) {
-                        launch {
+                        launch (start = CoroutineStart.UNDISPATCHED) {
                             awaitPointerEventScope {
                                 while (true) {
                                     val event = awaitPointerEvent()
@@ -515,9 +516,9 @@ fun DifficultyScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(selectedOption, vibrationEnabled, voiceoverEnabled) {
+            .pointerInput(Unit) {
                 coroutineScope {
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectTapGestures(
                             onTap = {},
                             onDoubleTap = {
@@ -527,7 +528,7 @@ fun DifficultyScreen(
                                 speak("Selected.", "selected")
                                 launch {
                                     delay(1200)
-                                    onNext(selectedOption)
+                                    onNext(options[selectedIndex])
                                 }
                             },
                             onLongPress = {
@@ -543,7 +544,7 @@ fun DifficultyScreen(
                         )
                     }
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectHorizontalDragGestures(
                             onDragStart = {
                                 dragAmountTotal = 0f
@@ -579,7 +580,7 @@ fun DifficultyScreen(
                         }
                     }
 
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent()
@@ -795,9 +796,9 @@ fun SummaryScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .pointerInput(confirmed, vibrationEnabled, voiceoverEnabled) {
+            .pointerInput(Unit) {
                 coroutineScope {
-                    launch {
+                    launch (start = CoroutineStart.UNDISPATCHED) {
                         detectTapGestures(
                             onTap = {},
                             onDoubleTap = {
