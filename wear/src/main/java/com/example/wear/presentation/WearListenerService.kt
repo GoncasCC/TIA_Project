@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/**
+ * Canonical wearable session state shared between the listener service, activity, and UI.
+ */
 data class SessionData(
     val progress: Float = 0f,
     val level: Int = 1,
@@ -26,6 +29,9 @@ data class SessionData(
     val needsSpeedUp: Boolean = false
 )
 
+/**
+ * State holder for the active workout running on the watch.
+ */
 object WearSessionRepository {
     private val _session = MutableStateFlow(SessionData())
     val session: StateFlow<SessionData> = _session.asStateFlow()
@@ -41,6 +47,10 @@ object WearSessionRepository {
     fun setSessionActive(active: Boolean) { _sessionActive.value = active }
 }
 
+/**
+ * Background wearable listener that accepts session commands from the phone and updates
+ * the shared watch session state.
+ */
 class WearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

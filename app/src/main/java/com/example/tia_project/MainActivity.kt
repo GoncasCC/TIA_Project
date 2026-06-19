@@ -16,6 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import com.example.tia_project.screens.*
 
+/**
+ * Main phone entry point.
+ * It keeps the app's screen state in Compose and wires together setup,
+ * training, guide, progress, and summary flows.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -198,6 +203,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Minimal fallback screen used for simple text-only states with a long-press back gesture.
+ */
 @Composable
 fun SimpleTextScreen(
     text: String,

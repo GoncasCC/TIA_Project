@@ -25,6 +25,14 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
+private val StopWarningColor = Color(0xFF9C27B0)
+private val PaceWarningColor = Color(0xFFE69F00)
+
+/**
+ * Live wearable workout UI.
+ * It renders progress, exposes pause/finish gestures, and flashes warning states such as
+ * stopping mid-session or needing to increase pace in Pushing Limits mode.
+ */
 @Composable
 fun WatchProgressScreen(
     progress: Float = 0.45f,
@@ -81,8 +89,8 @@ fun WatchProgressScreen(
 
     val arcColor = when {
         localPaused                                     -> Color.White
-        isStopped                                       -> Color(0xFF9C27B0)
-        difficulty == "PUSHING LIMITS" && needsSpeedUp -> Color(0xFFFF6D00)
+        isStopped                                       -> StopWarningColor
+        difficulty == "PUSHING LIMITS" && needsSpeedUp -> PaceWarningColor
         else                                            -> Color.White
     }
 

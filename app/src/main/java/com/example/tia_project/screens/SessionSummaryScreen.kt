@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Locale
 
+/**
+ * End-of-session summary shown after the watch reports the final distance and duration.
+ */
 @Composable
 fun SessionSummaryScreen(
     distanceKm: Float,

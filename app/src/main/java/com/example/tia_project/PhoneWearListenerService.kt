@@ -4,6 +4,10 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONObject
 
+/**
+ * Phone-side wearable listener that receives watch events and pushes them into
+ * [WatchDataRepository] for the Compose UI to consume.
+ */
 class PhoneWearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

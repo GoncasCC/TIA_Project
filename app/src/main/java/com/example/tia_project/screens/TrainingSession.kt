@@ -14,6 +14,11 @@ import com.example.tia_project.WatchDataRepository
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 
+/**
+ * Phone-side session coordinator.
+ * It starts the watch workout, plays audio feedback, listens for watch events,
+ * and persists the finished session for progress and personal-best screens.
+ */
 @Composable
 fun TrainingSession(
     goalType: String,
@@ -216,6 +221,10 @@ private fun modeKey(goalType: String, goalValue: String): String {
     }
 }
 
+/**
+ * Persists a finished session in SharedPreferences so progress and personal-best
+ * screens can rebuild history without a separate database layer.
+ */
 private fun saveTrainingSession(
     context: Context,
     goalType: String,
@@ -233,6 +242,10 @@ private fun saveTrainingSession(
 }
 
 
+/**
+ * Returns the best historical session for the selected mode.
+ * Distance goals compare fastest completion time, while time goals compare distance covered.
+ */
 fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String): SavedSession? {
     val mode = modeKey(goalType, goalValue)
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
@@ -258,6 +271,9 @@ fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String
 
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
 
+/**
+ * Rough distance-to-step conversion used to seed the watch-side distance goal.
+ */
 private fun estimateTargetSteps(targetDistanceMeters: Float): Int {
     val averageStrideMeters = 0.7f
     return (targetDistanceMeters / averageStrideMeters).toInt().coerceAtLeast(1)

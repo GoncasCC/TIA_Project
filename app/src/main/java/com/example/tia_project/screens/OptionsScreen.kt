@@ -27,6 +27,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/**
+ * Settings screen for toggling the app's core accessibility and presentation preferences.
+ */
 @Composable
 fun OptionsScreen(
     voiceoverEnabled: Boolean,
@@ -260,6 +263,9 @@ fun OptionsScreen(
     }
 }
 
+/**
+ * Shared layout for the currently focused option and its on/off state.
+ */
 @Composable
 private fun OptionsLayout(
     selectedOption: String,

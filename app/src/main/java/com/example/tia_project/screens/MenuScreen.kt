@@ -29,6 +29,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/**
+ * Main menu for the phone app.
+ * It routes to setup, progress, guide, and options using the shared accessible gesture model.
+ */
 @Composable
 fun MenuScreen(
     onStartNewSession: () -> Unit,
@@ -75,6 +79,9 @@ fun MenuScreen(
     )
 }
 
+/**
+ * Reusable text-only menu container with spoken hints and swipe-based selection.
+ */
 @Composable
 private fun OptionTextMenuScreen(
     screenKey: String,

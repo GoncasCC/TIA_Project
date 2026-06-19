@@ -28,11 +28,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/**
+ * Page model for the progress carousel.
+ * It mixes personal-best pages with broader period-based summary pages.
+ */
 sealed class Page {
     data class PBMode(val label: String, val value: String, val speech: String) : Page()
     data class StatsPeriod(val period: String) : Page()
 }
 
+/**
+ * Progress dashboard that exposes personal bests and aggregate stats for several time windows.
+ */
 @Composable
 fun ProgressScreen(
     voiceoverEnabled: Boolean,
@@ -326,6 +333,9 @@ fun ProgressScreen(
     }
 }
 
+/**
+ * Serialized training session entry as stored in SharedPreferences.
+ */
 data class SavedSession(
     val date: String,
     val distanceKm: Float,
@@ -333,12 +343,18 @@ data class SavedSession(
     val mode: String = ""
 )
 
+/**
+ * Aggregated totals shown on the period-based progress pages.
+ */
 data class ProgressData(
     val totalDistanceKm: Float,
     val totalTimeSeconds: Int,
     val totalSessions: Int
 )
 
+/**
+ * Loads and deserializes the persisted session history used by the progress and PB screens.
+ */
 private fun loadSavedSessions(context: Context): List<SavedSession> {
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
     val rawSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
@@ -362,6 +378,9 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
     }
 }
 
+/**
+ * Aggregates session history for a named period such as today, this week, or all time.
+ */
 private fun calculateProgressForPeriod(
     period: String,
     sessions: List<SavedSession>
