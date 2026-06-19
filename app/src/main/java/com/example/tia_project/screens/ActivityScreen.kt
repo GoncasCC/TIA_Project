@@ -33,9 +33,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-/**
- * First setup step where the user chooses whether the workout target is time or distance.
- */
 @Composable
 fun GoalTypeScreen(
     voiceoverEnabled: Boolean,
@@ -63,9 +60,6 @@ fun GoalTypeScreen(
     )
 }
 
-/**
- * Second setup step where the user chooses the concrete target inside the selected goal type.
- */
 @Composable
 fun GoalValueScreen(
     goalType: String,
@@ -86,7 +80,7 @@ fun GoalValueScreen(
         screenKey = "goalValue_$goalType",
         options = options,
         imageForOption = { if (darkModeEnabled) R.drawable.one_darkmodeicon else R.drawable.one_lightmodeicon },
-        speechForOption = { option -> "Selecting goal value: $option." },
+        speechForOption = { option -> "Selecting goal value: ${option.toSpeechGoalValue()}." },
         voiceoverEnabled = voiceoverEnabled,
         vibrationEnabled = vibrationEnabled,
         darkModeEnabled = darkModeEnabled,
@@ -97,10 +91,6 @@ fun GoalValueScreen(
     )
 }
 
-/**
- * Shared gesture-driven picker used by the goal and value setup screens.
- * Swipe changes options, double tap confirms, and long press cancels the flow.
- */
 @Composable
 private fun OptionSelectionScreen(
     screenKey: String,
@@ -356,6 +346,39 @@ private fun GoalValueLayout(
     textColor: Color,
     darkModeEnabled: Boolean
 ) {
+    if (selectedOption == "1 KILOMETER") {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundColor)
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "1000",
+                color = textColor,
+                fontSize = 110.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "METERS",
+                color = textColor,
+                fontSize = 55.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        return
+    }
+
     val isOne = selectedOption.startsWith("1")
     val unit = selectedOption.substringAfter(" ")
     val number = selectedOption.substringBefore(" ")
@@ -401,9 +424,20 @@ private fun String.toReadableText(): String {
     return lowercase().replaceFirstChar { it.uppercase() }
 }
 
-/**
- * Setup step where the user chooses the workout intensity and feedback style.
- */
+private fun String.toDisplayGoalValue(): String {
+    return when (this) {
+        "1 KILOMETER" -> "1000 METERS"
+        else -> this
+    }
+}
+
+private fun String.toSpeechGoalValue(): String {
+    return when (this) {
+        "1 KILOMETER" -> "1000 meters"
+        else -> lowercase()
+    }
+}
+
 @Composable
 fun DifficultyScreen(
     voiceoverEnabled: Boolean,
@@ -653,10 +687,6 @@ fun DifficultyScreen(
     }
 }
 
-/**
- * Final confirmation screen before a workout starts.
- * It repeats the selected goal and difficulty and waits for an explicit confirmation gesture.
- */
 @Composable
 fun SummaryScreen(
     goalValue: String,
@@ -746,7 +776,7 @@ fun SummaryScreen(
         delay(400)
         if (confirmed || cancelled) return@LaunchedEffect
         tts?.speak(
-            "You selected Goal: $goalValue. Difficulty: $difficulty.",
+            "You selected Goal: ${goalValue.toSpeechGoalValue()}. Difficulty: $difficulty.",
             TextToSpeech.QUEUE_FLUSH,
             null,
             "summary1"
@@ -824,7 +854,7 @@ fun SummaryScreen(
                 ) {
 
                     Text(
-                        text = goalValue,
+                        text = goalValue.toDisplayGoalValue(),
                         color = if (darkModeEnabled) Color.White else Color.Black,
                         fontSize = 50.sp,
                         fontWeight = FontWeight.Bold,

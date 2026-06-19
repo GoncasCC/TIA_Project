@@ -27,19 +27,13 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.roundToInt
 
-/**
- * Page model for the progress carousel.
- * It mixes personal-best pages with broader period-based summary pages.
- */
 sealed class Page {
     data class PBMode(val label: String, val value: String, val speech: String) : Page()
     data class StatsPeriod(val period: String) : Page()
 }
 
-/**
- * Progress dashboard that exposes personal bests and aggregate stats for several time windows.
- */
 @Composable
 fun ProgressScreen(
     voiceoverEnabled: Boolean,
@@ -68,24 +62,24 @@ fun ProgressScreen(
     val pages: List<Page> = listOf(
         Page.PBMode(
             label = "1 MIN MODE",
-            value = if (pb1Min != null) pb1Min.distanceKm.toSignificantKm() else "---",
-            speech = if (pb1Min != null) "Personal best, 1 minute mode: ${pb1Min.distanceKm.toSignificantKmSpeech()} kilometers"
+            value = if (pb1Min != null) pb1Min.distanceKm.toSignificantMeters() else "---",
+            speech = if (pb1Min != null) "Personal best, 1 minute mode: ${pb1Min.distanceKm.toSignificantMetersSpeech()}"
             else "Personal best, 1 minute mode: no record yet"
         ),
         Page.PBMode(
             label = "5 MIN MODE",
-            value = if (pb5Min != null) pb5Min.distanceKm.toSignificantKm() else "---",
-            speech = if (pb5Min != null) "Personal best, 5 minutes mode: ${pb5Min.distanceKm.toSignificantKmSpeech()} kilometers"
+            value = if (pb5Min != null) pb5Min.distanceKm.toSignificantMeters() else "---",
+            speech = if (pb5Min != null) "Personal best, 5 minutes mode: ${pb5Min.distanceKm.toSignificantMetersSpeech()}"
             else "Personal best, 5 minutes mode: no record yet"
         ),
         Page.PBMode(
-            label = "1 KM MODE",
+            label = "1000 M MODE",
             value = if (pb1Km != null) pb1Km.timeSeconds.toReadableDuration() else "---",
             speech = if (pb1Km != null) {
                 val m = pb1Km.timeSeconds / 60
                 val s = pb1Km.timeSeconds % 60
-                "Personal best, 1 kilometer mode: $m minutes and $s seconds"
-            } else "Personal best, 1 kilometer mode: no record yet"
+                "Personal best, 1000 meter mode: $m minutes and $s seconds"
+            } else "Personal best, 1000 meter mode: no record yet"
         ),
         Page.StatsPeriod("TODAY"),
         Page.StatsPeriod("YESTERDAY"),
@@ -158,7 +152,7 @@ fun ProgressScreen(
                     "ALL TIME" -> "All time"
                     else -> page.period.lowercase()
                 }
-                val speech = "$periodText, you completed ${progressData.totalDistanceKm.toSignificantKmSpeech()} kilometers " +
+                val speech = "$periodText, you completed ${progressData.totalDistanceKm.toSignificantMetersSpeech()} " +
                         "in ${progressData.totalTimeSeconds.toReadableDurationForSpeech()}. " +
                         "Total sessions: ${progressData.totalSessions}."
                 tts?.speak(speech, TextToSpeech.QUEUE_FLUSH, null, "page_$pageIndex")
@@ -300,7 +294,7 @@ fun ProgressScreen(
                         Spacer(modifier = Modifier.height(70.dp))
 
                         Text(
-                            text = progressData.totalDistanceKm.toSignificantKm(),
+                            text = progressData.totalDistanceKm.toSignificantMeters(),
                             color = textColor,
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
@@ -333,9 +327,6 @@ fun ProgressScreen(
     }
 }
 
-/**
- * Serialized training session entry as stored in SharedPreferences.
- */
 data class SavedSession(
     val date: String,
     val distanceKm: Float,
@@ -343,18 +334,12 @@ data class SavedSession(
     val mode: String = ""
 )
 
-/**
- * Aggregated totals shown on the period-based progress pages.
- */
 data class ProgressData(
     val totalDistanceKm: Float,
     val totalTimeSeconds: Int,
     val totalSessions: Int
 )
 
-/**
- * Loads and deserializes the persisted session history used by the progress and PB screens.
- */
 private fun loadSavedSessions(context: Context): List<SavedSession> {
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
     val rawSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
@@ -378,9 +363,6 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
     }
 }
 
-/**
- * Aggregates session history for a named period such as today, this week, or all time.
- */
 private fun calculateProgressForPeriod(
     period: String,
     sessions: List<SavedSession>
@@ -422,20 +404,12 @@ private fun calculateProgressForPeriod(
     )
 }
 
-private fun Float.toSignificantKm(): String {
-    return when {
-        this >= 100f -> String.format(Locale.US, "%.0f KM", this)
-        this >= 10f  -> String.format(Locale.US, "%.1f KM", this)
-        else         -> String.format(Locale.US, "%.3f KM", this)
-    }
+private fun Float.toSignificantMeters(): String {
+    return "${(this * 1000f).roundToInt()} M"
 }
 
-private fun Float.toSignificantKmSpeech(): String {
-    return when {
-        this >= 100f -> String.format(Locale.US, "%.0f", this)
-        this >= 10f  -> String.format(Locale.US, "%.1f", this)
-        else         -> String.format(Locale.US, "%.3f", this)
-    }
+private fun Float.toSignificantMetersSpeech(): String {
+    return "${(this * 1000f).roundToInt()} meters"
 }
 
 private fun Int.toReadableDuration(): String {

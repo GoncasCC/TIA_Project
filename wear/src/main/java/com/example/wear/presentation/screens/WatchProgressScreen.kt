@@ -25,22 +25,19 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-private val StopWarningColor = Color(0xFF9C27B0)
 private val PaceWarningColor = Color(0xFFE69F00)
 
-/**
- * Live wearable workout UI.
- * It renders progress, exposes pause/finish gestures, and flashes warning states such as
- * stopping mid-session or needing to increase pace in Pushing Limits mode.
- */
 @Composable
 fun WatchProgressScreen(
     progress: Float = 0.45f,
     level: Int = 1,
+    sessionStarted: Boolean = false,
     paused: Boolean = false,
     isStopped: Boolean = false,
     difficulty: String = "JUST VIBING",
     needsSpeedUp: Boolean = false,
+    introTitle: String = "",
+    introValue: String = "",
     vibrationEnabled: Boolean = true,
     onPauseToggle: () -> Unit = {},
     onResume: () -> Unit = {},
@@ -66,6 +63,7 @@ fun WatchProgressScreen(
 
 
     val blinkFrequency = when {
+        !sessionStarted                                  -> 0
         localPaused                                     -> 500
         isStopped                                       -> 200
         difficulty == "PUSHING LIMITS" && needsSpeedUp -> 600
@@ -88,8 +86,9 @@ fun WatchProgressScreen(
     }
 
     val arcColor = when {
+        !sessionStarted                                  -> Color.White
         localPaused                                     -> Color.White
-        isStopped                                       -> StopWarningColor
+        isStopped                                       -> Color(0xFF9C27B0)
         difficulty == "PUSHING LIMITS" && needsSpeedUp -> PaceWarningColor
         else                                            -> Color.White
     }
@@ -98,7 +97,8 @@ fun WatchProgressScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(askingToEnd, vibrationEnabled, isStopped) {
+            .pointerInput(sessionStarted, askingToEnd, vibrationEnabled, isStopped) {
+                if (!sessionStarted) return@pointerInput
                 coroutineScope {
                     if (askingToEnd) {
                         launch (start = CoroutineStart.UNDISPATCHED) {
@@ -170,7 +170,29 @@ fun WatchProgressScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (askingToEnd) {
+        if (!sessionStarted && introTitle.isNotBlank() && introValue.isNotBlank()) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = introTitle,
+                    color = Color(0xFFFFCC00),
+                    fontSize = 50.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = introValue,
+                    color = Color.White,
+                    fontSize = 50.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else if (askingToEnd) {
             Text(
                 text = "FINISH?",
                 color = Color(0xFFFFCC00),

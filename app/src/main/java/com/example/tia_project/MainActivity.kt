@@ -16,11 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import com.example.tia_project.screens.*
 
-/**
- * Main phone entry point.
- * It keeps the app's screen state in Compose and wires together setup,
- * training, guide, progress, and summary flows.
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,8 +54,9 @@ class MainActivity : ComponentActivity() {
             var darkModeEnabled by remember { mutableStateOf(true) }
 
 
-            var finalDistance by remember { mutableStateOf(0f) }
+            var finalDistanceMeters by remember { mutableStateOf(0f) }
             var finalTime by remember { mutableStateOf(0) }
+            var finalIsNewPersonalBest by remember { mutableStateOf(false) }
 
             fun goToMenu() {
                 menuInstance++
@@ -180,10 +176,10 @@ class MainActivity : ComponentActivity() {
                     musicEnabled = musicEnabled,
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
-                    onFinish = { distance, time ->
-
-                        finalDistance = distance
+                    onFinish = { distanceMeters, time, isNewPersonalBest ->
+                        finalDistanceMeters = distanceMeters
                         finalTime = time
+                        finalIsNewPersonalBest = isNewPersonalBest
                         currentScreen = "session_summary"
                     },
                     onCancel = { goToMenu() }
@@ -191,8 +187,9 @@ class MainActivity : ComponentActivity() {
 
 
                 "session_summary" -> SessionSummaryScreen(
-                    distanceKm = finalDistance,
+                    distanceMeters = finalDistanceMeters,
                     timeSeconds = finalTime,
+                    isNewPersonalBest = finalIsNewPersonalBest,
                     voiceoverEnabled = voiceoverEnabled,
                     vibrationEnabled = vibrationEnabled,
                     darkModeEnabled = darkModeEnabled,
@@ -203,9 +200,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Minimal fallback screen used for simple text-only states with a long-press back gesture.
- */
 @Composable
 fun SimpleTextScreen(
     text: String,

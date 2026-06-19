@@ -23,14 +23,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlin.math.roundToInt
 
-/**
- * End-of-session summary shown after the watch reports the final distance and duration.
- */
 @Composable
 fun SessionSummaryScreen(
-    distanceKm: Float,
+    distanceMeters: Float,
     timeSeconds: Int,
+    isNewPersonalBest: Boolean,
     voiceoverEnabled: Boolean,
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
@@ -42,11 +41,7 @@ fun SessionSummaryScreen(
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
 
     val minutes = timeSeconds / 60
-    val distanceStr = when {
-        distanceKm >= 100f -> String.format(Locale.US, "%.0f", distanceKm)
-        distanceKm >= 10f  -> String.format(Locale.US, "%.1f", distanceKm)
-        else               -> String.format(Locale.US, "%.3f", distanceKm)
-    }
+    val distanceText = "${distanceMeters.roundToInt()} M"
 
     val vibrator = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -78,7 +73,9 @@ fun SessionSummaryScreen(
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
         if (isTtsReady && voiceoverEnabled) {
             delay(500)
-            val speechText = "Session finished. You did $distanceStr kilometers in $minutes minutes. Double tap to go back to menu."
+            val personalBestText = if (isNewPersonalBest) " New personal best." else ""
+            val speechText =
+                "Session finished. You did ${distanceMeters.roundToInt()} meters in $minutes minutes.$personalBestText Double tap to go back to menu."
             tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "summary_stats")
         }
     }
@@ -128,13 +125,26 @@ fun SessionSummaryScreen(
             )
 
             Text(
-                text = "$distanceStr KM",
+                text = distanceText,
                 color = textColor,
                 fontSize = 50.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (isNewPersonalBest) {
+                Text(
+                    text = "NEW PERSONAL BEST",
+                    color = accentColor,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             Text(
                 text = "$minutes MIN",

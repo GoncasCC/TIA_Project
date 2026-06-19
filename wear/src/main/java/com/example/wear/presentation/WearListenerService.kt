@@ -10,12 +10,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Canonical wearable session state shared between the listener service, activity, and UI.
- */
 data class SessionData(
     val progress: Float = 0f,
     val level: Int = 1,
+    val sessionStarted: Boolean = false,
     val paused: Boolean = false,
     val isStopped: Boolean = false,
     val difficulty: String = "JUST VIBING",
@@ -26,12 +24,11 @@ data class SessionData(
     val voiceoverEnabled: Boolean = true,
     val personalBestDistanceKm: Float = 0f,
     val personalBestTimeSeconds: Int = 0,
-    val needsSpeedUp: Boolean = false
+    val needsSpeedUp: Boolean = false,
+    val introTitle: String = "",
+    val introValue: String = ""
 )
 
-/**
- * State holder for the active workout running on the watch.
- */
 object WearSessionRepository {
     private val _session = MutableStateFlow(SessionData())
     val session: StateFlow<SessionData> = _session.asStateFlow()
@@ -47,10 +44,6 @@ object WearSessionRepository {
     fun setSessionActive(active: Boolean) { _sessionActive.value = active }
 }
 
-/**
- * Background wearable listener that accepts session commands from the phone and updates
- * the shared watch session state.
- */
 class WearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -74,9 +67,20 @@ class WearListenerService : WearableListenerService() {
                         vibrationEnabled = json.optBoolean("vibrationEnabled", true),
                         voiceoverEnabled = json.optBoolean("voiceoverEnabled", true),
                         personalBestDistanceKm = json.optDouble("personalBestDistanceKm", 0.0).toFloat(),
-                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0)
+                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0),
+                        introTitle = json.optString("introTitle", ""),
+                        introValue = json.optString("introValue", "")
                     ))
                     WearSessionRepository.setSessionActive(true)
+                }
+                "/session_go" -> {
+                    WearSessionRepository.update(
+                        WearSessionRepository.session.value.copy(
+                            sessionStarted = true,
+                            introTitle = "",
+                            introValue = ""
+                        )
+                    )
                 }
                 "/watch_command" -> {
                     val cmd = json.optString("command", "")

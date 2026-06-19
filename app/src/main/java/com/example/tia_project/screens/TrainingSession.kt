@@ -2,23 +2,30 @@ package com.example.tia_project.screens
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import android.media.MediaPlayer
 import com.example.tia_project.R
 import com.example.tia_project.WatchDataRepository
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material3.Text
+import java.util.Locale
+import kotlin.math.roundToInt
 
-/**
- * Phone-side session coordinator.
- * It starts the watch workout, plays audio feedback, listens for watch events,
- * and persists the finished session for progress and personal-best screens.
- */
 @Composable
 fun TrainingSession(
     goalType: String,
@@ -28,21 +35,26 @@ fun TrainingSession(
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
     musicEnabled: Boolean,
-    onFinish: (Float, Int) -> Unit,
+    onFinish: (Float, Int, Boolean) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
     val backgroundColor = Color.Black
 
-    val isDistanceGoal = goalType == "DISTANCE"
-    val targetDistanceMeters = remember(goalValue) { goalValue.extractNumber() * 1000f }
-    val targetTimeSeconds = remember(goalValue) { goalValue.extractNumber() * 60 }
-
+    val targetDistanceMeters = remember(goalValue) { goalValue.toGoalDistanceMeters().toFloat() }
     val isOneMinuteMode = goalType == "TIME" && goalValue.extractNumber() == 1
+    val personalBest = remember(goalType, goalValue) {
+        getPersonalBestForMode(context, goalType, goalValue)
+    }
+    val introData = remember(goalType, goalValue, personalBest) {
+        buildSessionIntro(goalType, goalValue, personalBest)
+    }
 
     var isPaused by remember { mutableStateOf(false) }
     var isStarting by remember { mutableStateOf(true) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var introTitle by remember { mutableStateOf(introData?.title ?: "") }
+    var introValue by remember { mutableStateOf(introData?.value ?: "") }
 
     var musicLevel by remember { mutableStateOf(1) }
 
@@ -50,7 +62,6 @@ fun TrainingSession(
     val watchResult by WatchDataRepository.result.collectAsState()
 
     val isJustVibing = difficulty == "JUST VIBING"
-    val isStartingToSweat = difficulty == "STARTING TO SWEAT"
     val isPushingLimits = difficulty == "PUSHING LIMITS"
 
     var tts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
@@ -71,7 +82,6 @@ fun TrainingSession(
     LaunchedEffect(Unit) {
         WatchDataRepository.clearSessionState()
 
-        val personalBest = getPersonalBestForMode(context, goalType, goalValue)
         sendMessageToWatch(
             context, "/session_start", mapOf(
                 "goalType"                to goalType,
@@ -81,31 +91,34 @@ fun TrainingSession(
                 "vibrationEnabled"        to vibrationEnabled,
                 "voiceoverEnabled"        to voiceoverEnabled,
                 "personalBestDistanceKm"  to (personalBest?.distanceKm ?: 0f),
-                "personalBestTimeSeconds" to (personalBest?.timeSeconds ?: 0)
+                "personalBestTimeSeconds" to (personalBest?.timeSeconds ?: 0),
+                "introTitle"              to introTitle,
+                "introValue"              to introValue
             )
         )
 
-        if (isPushingLimits && voiceoverEnabled && personalBest != null) {
-
+        if (isPushingLimits && voiceoverEnabled && introData != null) {
             var waited = 0
             while (!isTtsReady && waited < 3000) {
                 delay(100)
                 waited += 100
             }
-            val pbText = if (goalType == "DISTANCE") {
-                val mins = personalBest.timeSeconds / 60
-                val secs = personalBest.timeSeconds % 60
-                "Your personal best for 1 kilometer is ${mins} minutes and ${secs} seconds. Let's try to beat it!"
-            } else {
-                val km = String.format(java.util.Locale.US, "%.2f", personalBest.distanceKm)
-                val modeLabel = if (goalValue.extractNumber() == 1) "1 minute" else "${goalValue.extractNumber()} minutes"
-                "Your personal best for $modeLabel is $km kilometers. Let's try to beat it!"
+            tts?.speak(introData.speech, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "pb_announce")
+            while (tts?.isSpeaking == true) {
+                delay(100)
             }
-            tts?.speak(pbText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "pb_announce")
-            delay(4000)
+            delay(200)
+            tts?.speak("Ok, let's start moving.", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "session_go")
+            while (tts?.isSpeaking == true) {
+                delay(100)
+            }
+        } else {
+            delay(1200)
         }
 
-        delay(2500)
+        sendMessageToWatch(context, "/session_go")
+        introTitle = ""
+        introValue = ""
         isStarting = false
     }
 
@@ -144,12 +157,15 @@ fun TrainingSession(
         )
 
         delay(1200)
-        onFinish(watchResult.distanceMeters / 1000f, watchResult.elapsedSeconds)
+        onFinish(
+            watchResult.distanceMeters,
+            watchResult.elapsedSeconds,
+            watchResult.isNewPersonalBest
+        )
     }
 
     val watchLevel by WatchDataRepository.level.collectAsState()
     val watchProgress by WatchDataRepository.progress.collectAsState()
-    val totalLevels = remember(goalValue) { goalValue.extractNumber().coerceAtLeast(1) }
 
     LaunchedEffect(watchLevel, watchProgress.progress) {
         if (watchLevel > 0) musicLevel = watchLevel
@@ -210,21 +226,46 @@ fun TrainingSession(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-    ) { }
+    ) {
+        if (isStarting && introTitle.isNotBlank() && introValue.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = introTitle,
+                    color = Color(0xFFFFCC00),
+                    fontSize = 60.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = introValue,
+                    color = Color.White,
+                    fontSize = 60.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                )
+            }
+        }
+    }
 }
 
 private fun modeKey(goalType: String, goalValue: String): String {
     return if (goalType == "DISTANCE") {
-        "${goalValue.extractNumber()} KM"
+        if (goalValue.toGoalDistanceMeters() == 1000) "1 KM" else "${goalValue.toGoalDistanceMeters()} M"
     } else {
         "${goalValue.extractNumber()} MIN"
     }
 }
 
-/**
- * Persists a finished session in SharedPreferences so progress and personal-best
- * screens can rebuild history without a separate database layer.
- */
 private fun saveTrainingSession(
     context: Context,
     goalType: String,
@@ -242,10 +283,6 @@ private fun saveTrainingSession(
 }
 
 
-/**
- * Returns the best historical session for the selected mode.
- * Distance goals compare fastest completion time, while time goals compare distance covered.
- */
 fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String): SavedSession? {
     val mode = modeKey(goalType, goalValue)
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
@@ -271,9 +308,14 @@ fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String
 
 private fun String.extractNumber(): Int = substringBefore(" ").toIntOrNull() ?: 1
 
-/**
- * Rough distance-to-step conversion used to seed the watch-side distance goal.
- */
+private fun String.toGoalDistanceMeters(): Int {
+    return when {
+        contains("KILOMETER", ignoreCase = true) -> extractNumber() * 1000
+        contains("METER", ignoreCase = true) -> extractNumber()
+        else -> extractNumber() * 1000
+    }
+}
+
 private fun estimateTargetSteps(targetDistanceMeters: Float): Int {
     val averageStrideMeters = 0.7f
     return (targetDistanceMeters / averageStrideMeters).toInt().coerceAtLeast(1)
@@ -303,4 +345,36 @@ private fun sendMessageToWatch(
                     .addOnFailureListener { android.util.Log.e("WearDebug", "✗ $path falhou: ${it.message}") }
             }
         }
+}
+
+private data class SessionIntro(
+    val title: String,
+    val value: String,
+    val speech: String
+)
+
+private fun buildSessionIntro(
+    goalType: String,
+    goalValue: String,
+    personalBest: SavedSession?
+): SessionIntro? {
+    if (personalBest == null) return null
+
+    return if (goalType == "DISTANCE") {
+        val minutes = personalBest.timeSeconds / 60
+        val seconds = personalBest.timeSeconds % 60
+        SessionIntro(
+            title = "1000 M BEST",
+            value = String.format(Locale.US, "%02d:%02d", minutes, seconds),
+            speech = "Your personal best for 1000 meters is $minutes minutes and $seconds seconds. Let's try to beat it!"
+        )
+    } else {
+        val meters = (personalBest.distanceKm * 1000f).roundToInt()
+        val modeLabel = if (goalValue.extractNumber() == 1) "1 minute" else "${goalValue.extractNumber()} minutes"
+        SessionIntro(
+            title = "${goalValue.extractNumber()} MIN BEST",
+            value = "$meters M",
+            speech = "Your personal best for $modeLabel is $meters meters. Let's try to beat it!"
+        )
+    }
 }

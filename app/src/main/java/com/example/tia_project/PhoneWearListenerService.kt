@@ -4,10 +4,6 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONObject
 
-/**
- * Phone-side wearable listener that receives watch events and pushes them into
- * [WatchDataRepository] for the Compose UI to consume.
- */
 class PhoneWearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -27,7 +23,13 @@ class PhoneWearListenerService : WearableListenerService() {
                     val distanceMeters  = json.optDouble("distanceMeters", 0.0).toFloat()
                     val elapsedSeconds  = json.optInt("elapsedSeconds", 0)
                     val endedEarly      = json.optBoolean("endedEarly", false)
-                    WatchDataRepository.updateResult(distanceMeters, elapsedSeconds, endedEarly)
+                    val isNewPersonalBest = json.optBoolean("isNewPersonalBest", false)
+                    WatchDataRepository.updateResult(
+                        distanceMeters = distanceMeters,
+                        elapsedSeconds = elapsedSeconds,
+                        endedEarly = endedEarly,
+                        isNewPersonalBest = isNewPersonalBest
+                    )
                 }
             }
         } catch (e: Exception) {

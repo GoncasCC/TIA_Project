@@ -26,10 +26,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Locale
 
-/**
- * Ordered steps for the onboarding guide.
- * Each step introduces one gesture or workout concept before moving on.
- */
 private enum class GuideStep {
     SWIPE,
     DOUBLE_TAP,
@@ -41,9 +37,6 @@ private enum class GuideStep {
     FINISHED
 }
 
-/**
- * Interactive onboarding flow that teaches gestures and explains the three workout modes.
- */
 @Composable
 fun GuideScreen(
     voiceoverEnabled: Boolean,
@@ -299,9 +292,6 @@ fun GuideScreen(
     }
 }
 
-/**
- * Visual helper used by the guide to present the workout-mode cards consistently.
- */
 @Composable
 private fun GuideTrainingLayout(
     step: GuideStep,
