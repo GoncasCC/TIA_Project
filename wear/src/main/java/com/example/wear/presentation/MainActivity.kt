@@ -291,12 +291,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         if (!halfwayAnnounced && levelProgress >= 0.5f) {
             halfwayAnnounced = true
             vibrate("halfway")
-            speak("Halfway through level $level.")
+            speak("Halfway through stage $level.")
         }
         if (!levelEndAnnounced && levelProgress >= 0.98f) {
             levelEndAnnounced = true
             vibrate("level_complete")
-            speak("End of level $level.")
+            speak("End of stage $level.")
         }
     }
 

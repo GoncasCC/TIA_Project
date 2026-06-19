@@ -506,7 +506,7 @@ fun DifficultyScreen(
         delay(600)
         if (!isNavigating) {
             speak(
-                "Selecting level of difficulty: ${selectedOption.toReadableText()}.",
+                "Selecting difficulty mode: ${selectedOption.toReadableText()}.",
                 "difficulty_$selectedOption"
             )
         }
@@ -614,7 +614,7 @@ fun DifficultyScreen(
                 .padding(horizontal = 20.dp, vertical = 40.dp)
         ) {
             Text(
-                text = "LEVEL",
+                text = "Mode",
                 color = if (darkModeEnabled) Color.White else Color.Black,
                 fontSize = 82.sp,
                 fontWeight = FontWeight.Bold,
