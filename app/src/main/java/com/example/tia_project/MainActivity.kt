@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
 
             var menuInstance by remember { mutableStateOf(0) }
 
-            var selectedActivity by remember { mutableStateOf("") }
+
             var selectedGoalType by remember { mutableStateOf("") }
             var selectedGoalValue by remember { mutableStateOf("") }
             var selectedDifficulty by remember { mutableStateOf("") }
@@ -63,7 +63,6 @@ class MainActivity : ComponentActivity() {
             }
 
             fun cancelSetup() {
-                selectedActivity = ""
                 selectedGoalType = ""
                 selectedGoalValue = ""
                 selectedDifficulty = ""
@@ -74,7 +73,7 @@ class MainActivity : ComponentActivity() {
 
                 "menu" -> key(menuInstance) {
                     MenuScreen(
-                        onStartNewSession = { currentScreen = "activity" },
+                        onStartNewSession = { currentScreen = "goalType" },
                         onProgress = { currentScreen = "progress" },
                         onGuide = {
                             showReopenGuideMessage = false
@@ -99,17 +98,6 @@ class MainActivity : ComponentActivity() {
                     onBack = { goToMenu() }
                 )
 
-                "activity" -> ActivityScreen(
-                    voiceoverEnabled = voiceoverEnabled,
-                    vibrationEnabled = vibrationEnabled,
-                    darkModeEnabled = darkModeEnabled,
-                    onNext = { activity ->
-                        selectedActivity = activity
-                        currentScreen = "goalType"
-                    },
-                    onCancel = { cancelSetup() }
-                )
-
                 "goalType" -> GoalTypeScreen(
                     voiceoverEnabled = voiceoverEnabled,
                     vibrationEnabled = vibrationEnabled,
@@ -118,7 +106,6 @@ class MainActivity : ComponentActivity() {
                         selectedGoalType = goalType
                         currentScreen = "goalValue"
                     },
-                    onBack = { currentScreen = "activity" },
                     onCancel = { cancelSetup() }
                 )
 
@@ -148,7 +135,6 @@ class MainActivity : ComponentActivity() {
                 )
 
                 "summary" -> SummaryScreen(
-                    activity = selectedActivity,
                     goalValue = selectedGoalValue,
                     difficulty = selectedDifficulty,
                     voiceoverEnabled = voiceoverEnabled,
@@ -182,7 +168,6 @@ class MainActivity : ComponentActivity() {
                 )
 
                 "training" -> TrainingSession(
-                    activity = selectedActivity,
                     goalType = selectedGoalType,
                     goalValue = selectedGoalValue,
                     difficulty = selectedDifficulty,

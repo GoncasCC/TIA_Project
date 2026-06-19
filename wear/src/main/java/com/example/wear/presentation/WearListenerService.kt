@@ -23,7 +23,6 @@ data class SessionData(
     val voiceoverEnabled: Boolean = true,
     val personalBestDistanceKm: Float = 0f,
     val personalBestTimeSeconds: Int = 0,
-    val activity: String = "RUNNING",
     val needsSpeedUp: Boolean = false
 )
 

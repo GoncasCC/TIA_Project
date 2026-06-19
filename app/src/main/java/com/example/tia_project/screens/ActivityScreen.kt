@@ -34,39 +34,11 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
-fun ActivityScreen(
-    voiceoverEnabled: Boolean,
-    vibrationEnabled: Boolean,
-    darkModeEnabled: Boolean,
-    onNext: (String) -> Unit,
-    onCancel: () -> Unit
-) {
-    OptionSelectionScreen(
-        screenKey = "activity",
-        options = listOf("WALK", "RUN"),
-        imageForOption = { option ->
-            if (option == "WALK") {
-                if (darkModeEnabled) R.drawable.walk_darkmodeicon else R.drawable.walk_lightmodeicon
-            } else {
-                if (darkModeEnabled) R.drawable.run_darkmodeicon else R.drawable.run_lightmodeicon
-            }
-        },
-        speechForOption = { option -> "Selecting activity: ${option.toReadableText()}." },
-        voiceoverEnabled = voiceoverEnabled,
-        vibrationEnabled = vibrationEnabled,
-        darkModeEnabled = darkModeEnabled,
-        onNext = onNext,
-        onCancel = onCancel
-    )
-}
-
-@Composable
 fun GoalTypeScreen(
     voiceoverEnabled: Boolean,
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
     onNext: (String) -> Unit,
-    onBack: () -> Unit,
     onCancel: () -> Unit
 ) {
     OptionSelectionScreen(
@@ -84,7 +56,6 @@ fun GoalTypeScreen(
         vibrationEnabled = vibrationEnabled,
         darkModeEnabled = darkModeEnabled,
         onNext = onNext,
-        onBack = onBack,
         onCancel = onCancel
     )
 }
@@ -671,7 +642,6 @@ fun DifficultyScreen(
 
 @Composable
 fun SummaryScreen(
-    activity: String,
     goalValue: String,
     difficulty: String,
     voiceoverEnabled: Boolean,
@@ -759,7 +729,7 @@ fun SummaryScreen(
         delay(400)
         if (confirmed || cancelled) return@LaunchedEffect
         tts?.speak(
-            "You selected $activity. Goal: $goalValue. Difficulty: $difficulty.",
+            "You selected Goal: $goalValue. Difficulty: $difficulty.",
             TextToSpeech.QUEUE_FLUSH,
             null,
             "summary1"
@@ -835,14 +805,7 @@ fun SummaryScreen(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = activity,
-                        color = if (darkModeEnabled) Color.White else Color.Black,
-                        fontSize = 50.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+
                     Text(
                         text = goalValue,
                         color = if (darkModeEnabled) Color.White else Color.Black,

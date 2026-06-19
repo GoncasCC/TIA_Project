@@ -146,17 +146,17 @@ fun GuideScreen(
             )
 
             GuideStep.EASYMODE -> speak(
-                "Now let's learn about the exercise modes. You can choose one of three modes. Just Vibing is the easiest mode. It is designed for relaxed walking or running, with no progress feedback during the session. You will hear relaxing music, or footsteps if music is disabled. Double tap to continue.",
+                "Now let's learn about the exercise modes. You can choose one of three modes. Just Vibing is the easiest mode. It is designed for relaxed physical activity, with no progress feedback during the session. You will hear relaxing music, or footsteps if music is disabled. Double tap to continue.",
                 "guide_modes"
             )
 
             GuideStep.MEDIUMMODE -> speak(
-                "Starting to Sweat is a medium intensity mode. Here, your workout is divided into stages with halfway milestones. You receive progress feedback as you exercise, and the music changes as you advance through each stage. If music is disabled, you will hear footsteps instead. Double tap to continue.",
+                "Starting to Sweat is a medium intensity mode. Here, your workout is divided into stages with halfway milestones. You receive progress feedback as you exercise. The music changes as you advance through each stage to tell you how close you are to finishing. If music is disabled, you will hear footsteps instead. Double tap to continue.",
                 "guide_modes"
             )
 
             GuideStep.HARDMODE -> speak(
-                "Pushing Limits is the most intense mode. Just like Starting to Sweat, it features stages where the music changes as you advance, but the system also encourages you to improve your pace and beat your personal best. You can disable the music and hear footsteps instead. Double tap to finish the guide.",
+                "Pushing Limits is the most intense mode. Just like Starting to Sweat, the music changes as you advance to show your progress towards the end, but the system also encourages you to improve your pace and beat your personal best. You can disable the music and hear footsteps instead. Double tap to finish the guide.",
                 "guide_modes"
             )
 

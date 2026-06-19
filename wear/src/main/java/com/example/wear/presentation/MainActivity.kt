@@ -27,6 +27,17 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnMessageReceivedListener {
 
+    companion object {
+
+        private const val WALK_STRIDE_METERS = 0.7f
+        private const val RUN_STRIDE_METERS  = 1.26f
+
+        private const val CADENCE_WINDOW_MS = 2_000L
+
+        private const val RUN_ON_CADENCE_SPM  = 140f
+        private const val RUN_OFF_CADENCE_SPM = 135f
+    }
+
     private lateinit var sensorManager: SensorManager
     private var stepCounterSensor: Sensor? = null
     private var accelerometerSensor: Sensor? = null
@@ -45,6 +56,13 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var personalBestAnnounced = false
     private var lastMotivationMs = 0L
     private var sessionSteps = 0
+
+    private var accumulatedDistanceMeters: Float = 0f
+    private var lastDistanceStepCount: Int = 0
+    private var cadenceWindowStartSteps: Int = 0
+    private var cadenceWindowStartMs: Long = 0L
+    private var smoothedCadenceSpm: Float = 0f
+    private var currentStrideMultiplier: Float = WALK_STRIDE_METERS
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var stopCheckJob: Job? = null
@@ -87,6 +105,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 if (resetSignal > 0L) {
                     initialSteps = null
                     sessionSteps = 0
+                    accumulatedDistanceMeters = 0f
+                    lastDistanceStepCount = 0
+                    cadenceWindowStartSteps = 0
+                    cadenceWindowStartMs = 0L
+                    smoothedCadenceSpm = 0f
+                    currentStrideMultiplier = WALK_STRIDE_METERS
                     lastLevel = 1
                     halfwayAnnounced = false
                     levelEndAnnounced = false
@@ -121,7 +145,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     onEndSession = {
                         speak("Finishing session.")
                         sendSessionResult(
-                            distanceMeters = sessionSteps * 0.7f,
+                            distanceMeters = accumulatedDistanceMeters,
                             elapsedSeconds = if (WearSessionRepository.session.value.goalType == "TIME") {
                                 val p = session.progress
                                 val targetSecs = session.goalValue.extractNumber() * 60
@@ -181,8 +205,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         vibrationEnabled        = json.optBoolean("vibrationEnabled", true),
                         voiceoverEnabled        = json.optBoolean("voiceoverEnabled", true),
                         personalBestDistanceKm  = json.optDouble("personalBestDistanceKm", 0.0).toFloat(),
-                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0),
-                        activity                = json.optString("activity", "RUNNING")
+                        personalBestTimeSeconds = json.optInt("personalBestTimeSeconds", 0)
                     ))
                     WearSessionRepository.setSessionActive(true)
                     resetSessionState()
@@ -244,19 +267,21 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         val totalSteps = event.values[0]
         if (initialSteps == null) initialSteps = totalSteps
         sessionSteps = (totalSteps - (initialSteps ?: totalSteps)).toInt()
+        updateDistanceAndCadence(System.currentTimeMillis())
 
         val progress: Float
         val level: Int
         val levelProgress: Float
 
         if (session.goalType == "DISTANCE") {
-            progress = (sessionSteps.toFloat() / session.targetSteps).coerceIn(0f, 1f)
-            val targetDistanceMeters = session.goalValue.extractNumber() * 1000
-            val metersPerCheckpoint = 200
-            val totalLevels = (targetDistanceMeters / metersPerCheckpoint).coerceAtLeast(1)
-            val stepsPerLevel = session.targetSteps / totalLevels
-            level = if (stepsPerLevel > 0) (sessionSteps / stepsPerLevel + 1).coerceIn(1, totalLevels) else 1
-            levelProgress = if (stepsPerLevel > 0) ((sessionSteps % stepsPerLevel).toFloat() / stepsPerLevel).coerceIn(0f, 1f) else 0f
+            val targetDistanceMeters = (session.goalValue.extractNumber() * 1000).toFloat()
+            val metersPerCheckpoint = 200f
+            val totalLevels = (targetDistanceMeters / metersPerCheckpoint).toInt().coerceAtLeast(1)
+            progress = (accumulatedDistanceMeters / targetDistanceMeters).coerceIn(0f, 1f)
+            level = (accumulatedDistanceMeters / metersPerCheckpoint).toInt()
+                .plus(1).coerceIn(1, totalLevels)
+            levelProgress = ((accumulatedDistanceMeters % metersPerCheckpoint) / metersPerCheckpoint)
+                .coerceIn(0f, 1f)
         } else {
             progress = session.progress
             level = session.level
@@ -277,7 +302,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
 
         if (session.difficulty == "PUSHING LIMITS") {
-            handlePersonalBestFeedback(sessionSteps, session)
+            handlePersonalBestFeedback(session)
         }
 
         if (progress >= 1f) {
@@ -286,6 +311,39 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun updateDistanceAndCadence(now: Long) {
+        if (cadenceWindowStartMs == 0L) {
+            cadenceWindowStartMs = now
+            cadenceWindowStartSteps = sessionSteps
+            lastDistanceStepCount = sessionSteps
+            return
+        }
+
+        val deltaSteps = sessionSteps - lastDistanceStepCount
+        if (deltaSteps > 0) {
+            accumulatedDistanceMeters += deltaSteps * currentStrideMultiplier
+            lastDistanceStepCount = sessionSteps
+        }
+
+        val windowMs = now - cadenceWindowStartMs
+        if (windowMs >= CADENCE_WINDOW_MS) {
+            val windowSteps = sessionSteps - cadenceWindowStartSteps
+            val instantSpm = windowSteps * 60_000f / windowMs
+            smoothedCadenceSpm =
+                if (smoothedCadenceSpm == 0f) instantSpm
+                else smoothedCadenceSpm * 0.5f + instantSpm * 0.5f
+
+            currentStrideMultiplier = when {
+                smoothedCadenceSpm >= RUN_ON_CADENCE_SPM  -> RUN_STRIDE_METERS
+                smoothedCadenceSpm <= RUN_OFF_CADENCE_SPM -> WALK_STRIDE_METERS
+                else -> currentStrideMultiplier
+            }
+
+            cadenceWindowStartMs = now
+            cadenceWindowStartSteps = sessionSteps
+        }
+    }
 
     private fun handleLevelFeedback(levelProgress: Float, level: Int, session: SessionData) {
         if (!halfwayAnnounced && levelProgress >= 0.5f) {
@@ -300,9 +358,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
-    private fun handlePersonalBestFeedback(steps: Int, session: SessionData) {
+    private fun handlePersonalBestFeedback(session: SessionData) {
         val pbDistanceMeters = session.personalBestDistanceKm * 1000f
-        val currentDistanceMeters = steps * 0.7f
+        val currentDistanceMeters = accumulatedDistanceMeters
 
         if (!personalBestAnnounced && pbDistanceMeters > 0f && currentDistanceMeters > pbDistanceMeters) {
             personalBestAnnounced = true
@@ -315,23 +373,23 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         if (now - lastMotivationMs < 15_000L) return
         lastMotivationMs = now
 
-        val pbSteps = (pbDistanceMeters / 0.7f).toInt()
-        val remainingPbSteps = pbSteps - steps
-        val remainingPbDistance = remainingPbSteps * 0.7f
+        val remainingPbDistance = pbDistanceMeters - currentDistanceMeters
 
         when {
             currentDistanceMeters >= pbDistanceMeters -> {
                 WearSessionRepository.update(session.copy(needsSpeedUp = false))
                 speak("You are beating your personal best. Keep going.")
             }
-            remainingPbSteps <= 0 -> {
+            remainingPbDistance <= 0f -> {
                 WearSessionRepository.update(session.copy(needsSpeedUp = false))
                 speak("Keep going. Focus on finishing strong.")
             }
             else -> {
-                val remainingSessionSteps = session.targetSteps - steps
-                if (remainingSessionSteps <= 0) return
-                if (remainingPbDistance <= remainingSessionSteps * 0.7f) {
+                val targetDistanceMeters = if (session.goalType == "DISTANCE")
+                    (session.goalValue.extractNumber() * 1000).toFloat() else Float.MAX_VALUE
+                val remainingSessionDistance = targetDistanceMeters - currentDistanceMeters
+                if (remainingSessionDistance <= 0f) return
+                if (remainingPbDistance <= remainingSessionDistance) {
                     WearSessionRepository.update(session.copy(needsSpeedUp = false))
                     speak("You can still beat your personal best. Keep this pace.")
                 } else {
@@ -368,7 +426,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
                 val recentStepDetected = lastDetectedStepMs > 0L &&
                         (System.currentTimeMillis() - lastDetectedStepMs) < 2_000L
-                val stepThreshold = if (session.activity.uppercase() == "WALK") 2 else 5
+                val stepThreshold = 3
                 val hasMoved = recentStepDetected || sessionSteps > lastStepsForStopCheck + stepThreshold
 
                 if (hasMoved) {
@@ -390,11 +448,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     if (now - lastNudgeMs >= 5_000L) {
                         lastNudgeMs = now
                         vibrate("nudge")
-                        val prompt = when (session.activity.uppercase()) {
-                            "WALK" -> "Let's start walking."
-                            else   -> "Let's start running."
-                        }
-                        speak(prompt)
+                        speak("Let's get moving.")
                     }
                 } else {
                     val now = System.currentTimeMillis()
@@ -414,7 +468,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 lastStepsForStopCheck = sessionSteps
 
                 if (session.difficulty == "PUSHING LIMITS" && everStarted) {
-                    handlePersonalBestFeedback(sessionSteps, session)
+                    handlePersonalBestFeedback(session)
                 }
 
                 delay(1_500L)
@@ -434,7 +488,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopCheckJob?.cancel()
         vibrate("session_complete")
         speak("Workout complete.")
-        val distanceMeters = sessionSteps * 0.7f
+        val distanceMeters = accumulatedDistanceMeters
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
@@ -511,6 +565,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         lastMotivationMs = 0L
         sessionSteps = 0
         initialSteps = null
+        accumulatedDistanceMeters = 0f
+        lastDistanceStepCount = 0
+        cadenceWindowStartSteps = 0
+        cadenceWindowStartMs = 0L
+        smoothedCadenceSpm = 0f
+        currentStrideMultiplier = WALK_STRIDE_METERS
         timerJob?.cancel()
         timerJob = null
         timerStartMs = 0L

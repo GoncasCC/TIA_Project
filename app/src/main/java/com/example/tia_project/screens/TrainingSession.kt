@@ -16,7 +16,6 @@ import androidx.compose.runtime.getValue
 
 @Composable
 fun TrainingSession(
-    activity: String,
     goalType: String,
     goalValue: String,
     difficulty: String,
@@ -71,7 +70,6 @@ fun TrainingSession(
         sendMessageToWatch(
             context, "/session_start", mapOf(
                 "goalType"                to goalType,
-                "activity"                to activity,
                 "goalValue"               to goalValue,
                 "difficulty"              to difficulty,
                 "targetSteps"             to estimateTargetSteps(targetDistanceMeters),
@@ -132,7 +130,6 @@ fun TrainingSession(
 
         saveTrainingSession(
             context       = context,
-            activity      = activity,
             goalType      = goalType,
             goalValue     = goalValue,
             difficulty    = difficulty,
@@ -221,7 +218,6 @@ private fun modeKey(goalType: String, goalValue: String): String {
 
 private fun saveTrainingSession(
     context: Context,
-    activity: String,
     goalType: String,
     goalValue: String,
     difficulty: String,
