@@ -34,8 +34,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
         private const val CADENCE_WINDOW_MS = 2_000L
 
-        private const val RUN_ON_CADENCE_SPM  = 140f
-        private const val RUN_OFF_CADENCE_SPM = 135f
+        private const val RUN_ON_CADENCE_SPM  = 100f
+        private const val RUN_OFF_CADENCE_SPM = 95f
     }
 
     private lateinit var sensorManager: SensorManager
