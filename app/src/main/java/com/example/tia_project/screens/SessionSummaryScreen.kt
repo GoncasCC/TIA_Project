@@ -161,7 +161,7 @@ fun SessionSummaryScreen(
                 Text(
                     text = "NEW PERSONAL BEST",
                     color = pushingLimitsColor,
-                    fontSize = 30.sp,
+                    fontSize = 50.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
