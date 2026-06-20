@@ -57,6 +57,7 @@ fun SessionSummaryScreen(
     } else {
         String.format(Locale.US, "%02d:%02d", minutes, seconds)
     }
+    val timeSpeechText = "$minutes minutes and $seconds seconds"
     val modeLabelText = if (goalType == "TIME") {
         "${goalValue.substringBefore(" ").toIntOrNull() ?: 1} MIN"
     } else {
@@ -94,9 +95,17 @@ fun SessionSummaryScreen(
         if (isTtsReady && voiceoverEnabled) {
             delay(500)
             val speechText = if (isNewPersonalBest) {
-                "Session finished. New personal best. $recordValueText. $modeLabelText mode. Double tap to go back to menu."
+                if (goalType == "TIME") {
+                    "Session finished. New personal best. $recordValueText. $modeLabelText mode. Double tap to go back to menu."
+                } else {
+                    "Session finished. New personal best. $timeSpeechText. $modeLabelText mode. Double tap to go back to menu."
+                }
             } else {
-                "Session finished. You did ${distanceMeters.roundToInt()} meters in $minutes minutes. Double tap to go back to menu."
+                if (goalType == "TIME") {
+                    "Session finished. You did ${distanceMeters.roundToInt()} meters in $minutes minutes. Double tap to go back to menu."
+                } else {
+                    "Session finished. You completed 1000 meters in $timeSpeechText. Double tap to go back to menu."
+                }
             }
             tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "summary_stats")
         }
@@ -150,7 +159,7 @@ fun SessionSummaryScreen(
                 Text(
                     text = "NEW PERSONAL BEST",
                     color = pushingLimitsColor,
-                    fontSize = 50.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
@@ -174,23 +183,43 @@ fun SessionSummaryScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                Text(
-                    text = sessionDistanceText,
-                    color = textColor,
-                    fontSize = 50.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (goalType == "TIME") {
+                    Text(
+                        text = sessionDistanceText,
+                        color = textColor,
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                Text(
-                    text = "$minutes MIN",
-                    color = textColor,
-                    fontSize = 50.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    Text(
+                        text = "$minutes MIN",
+                        color = textColor,
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = recordValueText,
+                        color = textColor,
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = modeLabelText,
+                        color = textColor,
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

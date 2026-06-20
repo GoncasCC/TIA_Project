@@ -87,7 +87,7 @@ fun ProgressScreen(
         ),
         Page.PBMode(
             label = "1000 M MODE",
-            value = if (pb1Km != null) pb1Km.timeSeconds.toReadableDuration() else "---",
+            value = if (pb1Km != null) pb1Km.timeSeconds.toMinuteSecondDisplay() else "---",
             speech = if (pb1Km != null) {
                 val m = pb1Km.timeSeconds / 60
                 val s = pb1Km.timeSeconds % 60
@@ -445,6 +445,12 @@ private fun Int.toReadableDuration(): String {
         hours > 0 -> String.format(Locale.US, "%dH %02dM", hours, minutes % 60)
         else -> String.format(Locale.US, "%d MIN", minutes)
     }
+}
+
+private fun Int.toMinuteSecondDisplay(): String {
+    val minutes = this / 60
+    val seconds = this % 60
+    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
 }
 
 private fun Int.toReadableDurationForSpeech(): String {
