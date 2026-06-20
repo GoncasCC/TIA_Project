@@ -195,6 +195,7 @@ class MainActivity : ComponentActivity() {
                 "session_summary" -> SessionSummaryScreen(
                     goalType = selectedGoalType,
                     goalValue = selectedGoalValue,
+                    difficulty = selectedDifficulty,
                     distanceMeters = finalDistanceMeters,
                     timeSeconds = finalTime,
                     isNewPersonalBest = finalIsNewPersonalBest,

@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         private const val PERSONAL_BEST_WARMUP_MS = 20_000L
         private const val PERSONAL_BEST_REMINDER_MS = 60_000L
         private const val COACHING_GAP_MS = 4_000L
-        private const val MAX_FEASIBLE_SPEED_MPS = 4.5f // Based on experimental tests
+        private const val MAX_FEASIBLE_SPEED_MPS = 5.5f
     }
 
     private enum class PersonalBestFeedbackState {
@@ -637,11 +637,15 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         } else {
             realElapsedSeconds()
         }
-        val isNewPersonalBest = if (session.goalType == "TIME") {
-            val previousBestMeters = session.personalBestDistanceKm * 1000f
-            previousBestMeters == 0f || accumulatedDistanceMeters > previousBestMeters
+        val isNewPersonalBest = if (session.difficulty == "PUSHING LIMITS") {
+            if (session.goalType == "TIME") {
+                val previousBestMeters = session.personalBestDistanceKm * 1000f
+                previousBestMeters == 0f || accumulatedDistanceMeters > previousBestMeters
+            } else {
+                session.personalBestTimeSeconds == 0 || elapsedSeconds < session.personalBestTimeSeconds
+            }
         } else {
-            session.personalBestTimeSeconds == 0 || elapsedSeconds < session.personalBestTimeSeconds
+            false
         }
 
         vibrate("session_complete")

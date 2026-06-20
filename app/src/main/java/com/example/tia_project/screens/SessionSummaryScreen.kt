@@ -35,6 +35,7 @@ import kotlin.math.roundToInt
 fun SessionSummaryScreen(
     goalType: String,
     goalValue: String,
+    difficulty: String,
     distanceMeters: Float,
     timeSeconds: Int,
     isNewPersonalBest: Boolean,
@@ -48,6 +49,7 @@ fun SessionSummaryScreen(
     val textColor = if (darkModeEnabled) Color.White else Color.Black
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
     val pushingLimitsColor = if (darkModeEnabled) Color(0xFF9C27B0) else Color(0xFF9C27B0)
+    val shouldHighlightPersonalBest = difficulty == "PUSHING LIMITS" && isNewPersonalBest
 
     val minutes = timeSeconds / 60
     val seconds = timeSeconds % 60
@@ -94,7 +96,7 @@ fun SessionSummaryScreen(
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
         if (isTtsReady && voiceoverEnabled) {
             delay(500)
-            val speechText = if (isNewPersonalBest) {
+            val speechText = if (shouldHighlightPersonalBest) {
                 if (goalType == "TIME") {
                     "Session finished. New personal best. $recordValueText. $modeLabelText mode. Double tap to go back to menu."
                 } else {
@@ -155,7 +157,7 @@ fun SessionSummaryScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            if (isNewPersonalBest) {
+            if (shouldHighlightPersonalBest) {
                 Text(
                     text = "NEW PERSONAL BEST",
                     color = pushingLimitsColor,

@@ -310,7 +310,7 @@ private fun saveTrainingSession(
     val oldSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
     val mode = modeKey(goalType, goalValue)
     val newSession =
-        "${System.currentTimeMillis()}|${distanceMeters / 1000f}|$elapsedSeconds|$mode|$endedEarly"
+        "${System.currentTimeMillis()}|${distanceMeters / 1000f}|$elapsedSeconds|$mode|$endedEarly|$difficulty"
     prefs.edit().putStringSet("sessions", oldSessions + newSession).apply()
 }
 
@@ -322,6 +322,15 @@ fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String
     val modeSessions = rawSessions.mapNotNull { raw ->
         val parts = raw.split("|")
         when {
+            parts.size == 6 && parts[3] == mode -> SavedSession(
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0,
+                mode = parts[3],
+                endedEarly = parts[4].toBooleanStrictOrNull() ?: false,
+                difficulty = parts[5]
+            )
+
             parts.size == 5 && parts[3] == mode -> SavedSession(
                 date = parts[0],
                 distanceKm = parts[1].toFloatOrNull() ?: 0f,

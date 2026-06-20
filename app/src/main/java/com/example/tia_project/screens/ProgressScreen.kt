@@ -346,7 +346,8 @@ data class SavedSession(
     val distanceKm: Float,
     val timeSeconds: Int,
     val mode: String = "",
-    val endedEarly: Boolean = false
+    val endedEarly: Boolean = false,
+    val difficulty: String = ""
 )
 
 /** Aggregated totals for one progress period page. */
@@ -364,6 +365,14 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
     return rawSessions.mapNotNull { raw ->
         val parts = raw.split("|")
         when (parts.size) {
+            6 -> SavedSession(
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0,
+                mode = parts[3],
+                endedEarly = parts[4].toBooleanStrictOrNull() ?: false,
+                difficulty = parts[5]
+            )
             5 -> SavedSession(
                 date = parts[0],
                 distanceKm = parts[1].toFloatOrNull() ?: 0f,
