@@ -55,10 +55,13 @@ fun TrainingSession(
     val backgroundColor = Color.Black
     val targetDistanceMeters = remember(goalValue) { goalValue.toGoalDistanceMeters().toFloat() }
     val isOneMinuteMode = goalType == "TIME" && goalValue.extractNumber() == 1
-    val personalBest = remember(goalType, goalValue) {
-        getPersonalBestForMode(context, goalType, goalValue)
+    val isJustVibing = difficulty == "JUST VIBING"
+    val isPushingLimits = difficulty == "PUSHING LIMITS"
+    val personalBest = remember(goalType, goalValue, isPushingLimits) {
+        if (isPushingLimits) getPersonalBestForMode(context, goalType, goalValue) else null
     }
-    val introData = remember(goalType, goalValue, personalBest) {
+    val introData = remember(goalType, goalValue, personalBest, isPushingLimits) {
+        if (!isPushingLimits) return@remember null
         buildSessionIntro(goalType, goalValue, personalBest)
     }
 
@@ -66,15 +69,12 @@ fun TrainingSession(
     var isStarting by remember { mutableStateOf(true) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var introTitle by remember { mutableStateOf(introData?.title ?: "GET READY") }
-    var introValue by remember { mutableStateOf(introData?.value ?: goalValue.toDisplayGoalValue()) }
+    var introValue by remember { mutableStateOf(introData?.value ?: "") }
     var musicLevel by remember { mutableStateOf(1) }
 
     val watchCommand by WatchDataRepository.command.collectAsState()
     val watchResult by WatchDataRepository.result.collectAsState()
     val watchLevel by WatchDataRepository.level.collectAsState()
-
-    val isJustVibing = difficulty == "JUST VIBING"
-    val isPushingLimits = difficulty == "PUSHING LIMITS"
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
@@ -264,22 +264,24 @@ fun TrainingSession(
                 Text(
                     text = introTitle,
                     color = Color(0xFFFFCC00),
-                    fontSize = 30.sp,
+                    fontSize = 50.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text(
-                    text = introValue,
-                    color = Color.White,
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp)
-                )
+                if (introValue.isNotBlank()) {
+                    Text(
+                        text = introValue,
+                        color = Color.White,
+                        fontSize = 55.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp)
+                    )
+                }
             }
         }
     }
@@ -307,7 +309,8 @@ private fun saveTrainingSession(
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
     val oldSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
     val mode = modeKey(goalType, goalValue)
-    val newSession = "${System.currentTimeMillis()}|${distanceMeters / 1000f}|$elapsedSeconds|$mode"
+    val newSession =
+        "${System.currentTimeMillis()}|${distanceMeters / 1000f}|$elapsedSeconds|$mode|$endedEarly"
     prefs.edit().putStringSet("sessions", oldSessions + newSession).apply()
 }
 
@@ -319,6 +322,14 @@ fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String
     val modeSessions = rawSessions.mapNotNull { raw ->
         val parts = raw.split("|")
         when {
+            parts.size == 5 && parts[3] == mode -> SavedSession(
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0,
+                mode = parts[3],
+                endedEarly = parts[4].toBooleanStrictOrNull() ?: false
+            )
+
             parts.size == 4 && parts[3] == mode -> SavedSession(
                 date = parts[0],
                 distanceKm = parts[1].toFloatOrNull() ?: 0f,
@@ -331,9 +342,13 @@ fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String
     }
 
     return if (goalType == "DISTANCE") {
-        modeSessions.filter { it.timeSeconds > 0 }.minByOrNull { it.timeSeconds }
+        modeSessions
+            .filter { !it.endedEarly && it.timeSeconds > 0 }
+            .minByOrNull { it.timeSeconds }
     } else {
-        modeSessions.maxByOrNull { it.distanceKm }
+        modeSessions
+            .filterNot { it.endedEarly }
+            .maxByOrNull { it.distanceKm }
     }
 }
 

@@ -57,13 +57,19 @@ fun ProgressScreen(
     val sessions = remember { loadSavedSessions(context) }
 
     val pb1Min = remember(sessions) {
-        sessions.filter { it.mode == "1 MIN" }.maxByOrNull { it.distanceKm }
+        sessions
+            .filter { it.mode == "1 MIN" && !it.endedEarly }
+            .maxByOrNull { it.distanceKm }
     }
     val pb5Min = remember(sessions) {
-        sessions.filter { it.mode == "5 MIN" }.maxByOrNull { it.distanceKm }
+        sessions
+            .filter { it.mode == "5 MIN" && !it.endedEarly }
+            .maxByOrNull { it.distanceKm }
     }
     val pb1Km = remember(sessions) {
-        sessions.filter { it.mode == "1 KM" && it.timeSeconds > 0 }.minByOrNull { it.timeSeconds }
+        sessions
+            .filter { it.mode == "1 KM" && !it.endedEarly && it.timeSeconds > 0 }
+            .minByOrNull { it.timeSeconds }
     }
 
     val pages: List<Page> = listOf(
@@ -339,7 +345,8 @@ data class SavedSession(
     val date: String,
     val distanceKm: Float,
     val timeSeconds: Int,
-    val mode: String = ""
+    val mode: String = "",
+    val endedEarly: Boolean = false
 )
 
 /** Aggregated totals for one progress period page. */
@@ -357,6 +364,13 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
     return rawSessions.mapNotNull { raw ->
         val parts = raw.split("|")
         when (parts.size) {
+            5 -> SavedSession(
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
+                timeSeconds = parts[2].toIntOrNull() ?: 0,
+                mode = parts[3],
+                endedEarly = parts[4].toBooleanStrictOrNull() ?: false
+            )
             4 -> SavedSession(
                 date = parts[0],
                 distanceKm = parts[1].toFloatOrNull() ?: 0f,

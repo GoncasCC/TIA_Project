@@ -47,6 +47,7 @@ fun SessionSummaryScreen(
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val textColor = if (darkModeEnabled) Color.White else Color.Black
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
+    val pushingLimitsColor = if (darkModeEnabled) Color(0xFF9C27B0) else Color(0xFF9C27B0)
 
     val minutes = timeSeconds / 60
     val seconds = timeSeconds % 60
@@ -148,8 +149,8 @@ fun SessionSummaryScreen(
             if (isNewPersonalBest) {
                 Text(
                     text = "NEW PERSONAL BEST",
-                    color = accentColor,
-                    fontSize = 30.sp,
+                    color = pushingLimitsColor,
+                    fontSize = 50.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()

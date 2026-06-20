@@ -186,18 +186,20 @@ fun WatchProgressScreen(
                 Text(
                     text = if (introTitle.isNotBlank()) introTitle else "GET READY",
                     color = Color(0xFFFFCC00),
-                    fontSize = 18.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (introValue.isNotBlank()) introValue else "",
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                if (introValue.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = introValue,
+                        color = Color.White,
+                        fontSize = 35.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         } else if (askingToEnd) {
             Text(
