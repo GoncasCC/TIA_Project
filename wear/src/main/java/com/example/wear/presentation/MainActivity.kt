@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         private const val PERSONAL_BEST_WARMUP_MS = 20_000L
         private const val PERSONAL_BEST_REMINDER_MS = 60_000L
         private const val COACHING_GAP_MS = 4_000L
-        private const val MAX_FEASIBLE_SPEED_MPS = 5.5f
+        private const val MAX_FEASIBLE_SPEED_MPS = 4.5f // Based on experimental tests
     }
 
     private enum class PersonalBestFeedbackState {
