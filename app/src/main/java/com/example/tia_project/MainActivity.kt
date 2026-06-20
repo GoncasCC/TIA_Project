@@ -16,6 +16,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import com.example.tia_project.screens.*
 
+/**
+ * Root phone activity.
+ *
+ * It keeps the top-level app state in Compose, switches between screens,
+ * and carries the session result into the final summary screen.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -187,6 +193,8 @@ class MainActivity : ComponentActivity() {
 
 
                 "session_summary" -> SessionSummaryScreen(
+                    goalType = selectedGoalType,
+                    goalValue = selectedGoalValue,
                     distanceMeters = finalDistanceMeters,
                     timeSeconds = finalTime,
                     isNewPersonalBest = finalIsNewPersonalBest,
@@ -200,6 +208,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Minimal full-screen fallback used by a few simple flows.
+ *
+ * A long press triggers the provided back action.
+ */
 @Composable
 fun SimpleTextScreen(
     text: String,

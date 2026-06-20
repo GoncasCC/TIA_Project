@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** Session state mirrored from the phone and consumed by the watch UI/runtime. */
 data class SessionData(
     val progress: Float = 0f,
     val level: Int = 1,
@@ -29,6 +30,12 @@ data class SessionData(
     val introValue: String = ""
 )
 
+/**
+ * Wear-side single source of truth for the active workout session.
+ *
+ * Both the listener service and the watch activity write to it, while the UI
+ * collects it to render the current workout state.
+ */
 object WearSessionRepository {
     private val _session = MutableStateFlow(SessionData())
     val session: StateFlow<SessionData> = _session.asStateFlow()
@@ -44,6 +51,7 @@ object WearSessionRepository {
     fun setSessionActive(active: Boolean) { _sessionActive.value = active }
 }
 
+/** Receives phone commands and bootstraps the wearable session state before the UI opens. */
 class WearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

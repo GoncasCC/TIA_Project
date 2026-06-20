@@ -33,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/** First setup step where the user chooses whether the workout is time- or distance-based. */
 @Composable
 fun GoalTypeScreen(
     voiceoverEnabled: Boolean,
@@ -60,6 +61,7 @@ fun GoalTypeScreen(
     )
 }
 
+/** Second setup step where the user chooses the concrete target for the selected goal type. */
 @Composable
 fun GoalValueScreen(
     goalType: String,
@@ -91,6 +93,12 @@ fun GoalValueScreen(
     )
 }
 
+/**
+ * Shared gesture-driven selector used by the setup screens.
+ *
+ * One-finger swipes cycle through options, double tap confirms, long press
+ * cancels, and the optional two-finger gesture navigates back.
+ */
 @Composable
 private fun OptionSelectionScreen(
     screenKey: String,
@@ -295,6 +303,7 @@ private fun OptionSelectionScreen(
     }
 }
 
+/** Layout for option screens that pair a title with a large supporting icon. */
 @Composable
 private fun IconOptionLayout(
     selectedOption: String,
@@ -339,6 +348,7 @@ private fun IconOptionLayout(
     }
 }
 
+/** Specialized rendering for goal values so time and distance targets stay visually clear. */
 @Composable
 private fun GoalValueLayout(
     selectedOption: String,
@@ -438,6 +448,7 @@ private fun String.toSpeechGoalValue(): String {
     }
 }
 
+/** Difficulty selection screen with distinct pacing/feedback styles for each workout mode. */
 @Composable
 fun DifficultyScreen(
     voiceoverEnabled: Boolean,
@@ -687,6 +698,7 @@ fun DifficultyScreen(
     }
 }
 
+/** Final confirmation screen shown before the workout is actually launched. */
 @Composable
 fun SummaryScreen(
     goalValue: String,

@@ -1,6 +1,8 @@
 package com.example.tia_project.screens
 
 import android.content.Context
+import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,7 +10,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -16,16 +26,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-import android.media.MediaPlayer
 import com.example.tia_project.R
 import com.example.tia_project.WatchDataRepository
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.material3.Text
+import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/**
+ * Phone-side session coordinator.
+ *
+ * This screen prepares the watch session, speaks the intro, mirrors pause and
+ * finish events from the watch, and persists the result for later progress
+ * screens and personal-best checks.
+ */
 @Composable
 fun TrainingSession(
     goalType: String,
@@ -40,7 +53,6 @@ fun TrainingSession(
 ) {
     val context = LocalContext.current
     val backgroundColor = Color.Black
-
     val targetDistanceMeters = remember(goalValue) { goalValue.toGoalDistanceMeters().toFloat() }
     val isOneMinuteMode = goalType == "TIME" && goalValue.extractNumber() == 1
     val personalBest = remember(goalType, goalValue) {
@@ -53,26 +65,28 @@ fun TrainingSession(
     var isPaused by remember { mutableStateOf(false) }
     var isStarting by remember { mutableStateOf(true) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-    var introTitle by remember { mutableStateOf(introData?.title ?: "") }
-    var introValue by remember { mutableStateOf(introData?.value ?: "") }
-
+    var introTitle by remember { mutableStateOf(introData?.title ?: "GET READY") }
+    var introValue by remember { mutableStateOf(introData?.value ?: goalValue.toDisplayGoalValue()) }
     var musicLevel by remember { mutableStateOf(1) }
 
     val watchCommand by WatchDataRepository.command.collectAsState()
     val watchResult by WatchDataRepository.result.collectAsState()
+    val watchLevel by WatchDataRepository.level.collectAsState()
 
     val isJustVibing = difficulty == "JUST VIBING"
     val isPushingLimits = difficulty == "PUSHING LIMITS"
 
-    var tts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsReady by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
-        val textToSpeech = android.speech.tts.TextToSpeech(context) { status ->
-            if (status == android.speech.tts.TextToSpeech.SUCCESS) isTtsReady = true
+        val textToSpeech = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                isTtsReady = true
+            }
         }
         tts = textToSpeech
-        textToSpeech.language = java.util.Locale.US
+        textToSpeech.language = Locale.US
         onDispose {
             textToSpeech.stop()
             textToSpeech.shutdown()
@@ -83,37 +97,52 @@ fun TrainingSession(
         WatchDataRepository.clearSessionState()
 
         sendMessageToWatch(
-            context, "/session_start", mapOf(
-                "goalType"                to goalType,
-                "goalValue"               to goalValue,
-                "difficulty"              to difficulty,
-                "targetSteps"             to estimateTargetSteps(targetDistanceMeters),
-                "vibrationEnabled"        to vibrationEnabled,
-                "voiceoverEnabled"        to voiceoverEnabled,
-                "personalBestDistanceKm"  to (personalBest?.distanceKm ?: 0f),
+            context,
+            "/session_start",
+            mapOf(
+                "goalType" to goalType,
+                "goalValue" to goalValue,
+                "difficulty" to difficulty,
+                "targetSteps" to estimateTargetSteps(targetDistanceMeters),
+                "vibrationEnabled" to vibrationEnabled,
+                "voiceoverEnabled" to voiceoverEnabled,
+                "personalBestDistanceKm" to (personalBest?.distanceKm ?: 0f),
                 "personalBestTimeSeconds" to (personalBest?.timeSeconds ?: 0),
-                "introTitle"              to introTitle,
-                "introValue"              to introValue
+                "introTitle" to introTitle,
+                "introValue" to introValue
             )
         )
 
-        if (isPushingLimits && voiceoverEnabled && introData != null) {
+        if (voiceoverEnabled) {
             var waited = 0
-            while (!isTtsReady && waited < 3000) {
+            while (!isTtsReady && waited < 3_000) {
                 delay(100)
                 waited += 100
             }
-            tts?.speak(introData.speech, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "pb_announce")
-            while (tts?.isSpeaking == true) {
-                delay(100)
+        }
+
+        when {
+            isPushingLimits && voiceoverEnabled && introData != null -> {
+                tts?.speak(introData.speech, TextToSpeech.QUEUE_FLUSH, null, "pb_announce")
+                while (tts?.isSpeaking == true) {
+                    delay(100)
+                }
+                delay(200)
+                tts?.speak("Ok, let's start moving.", TextToSpeech.QUEUE_FLUSH, null, "session_go")
+                while (tts?.isSpeaking == true) {
+                    delay(100)
+                }
             }
-            delay(200)
-            tts?.speak("Ok, let's start moving.", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "session_go")
-            while (tts?.isSpeaking == true) {
-                delay(100)
+
+            voiceoverEnabled -> {
+                delay(600)
+                tts?.speak("Ok, let's start moving.", TextToSpeech.QUEUE_FLUSH, null, "session_go")
+                while (tts?.isSpeaking == true) {
+                    delay(100)
+                }
             }
-        } else {
-            delay(1200)
+
+            else -> delay(1_500)
         }
 
         sendMessageToWatch(context, "/session_go")
@@ -127,14 +156,9 @@ fun TrainingSession(
         if (watchCommand.timestamp <= lastHandledCommandTimestamp) return@LaunchedEffect
         lastHandledCommandTimestamp = watchCommand.timestamp
 
-        val cmd = watchCommand.command.replace("\"", "").trim()
-        when (cmd) {
-            "pause" -> {
-                isPaused = true
-            }
-            "resume" -> {
-                isPaused = false
-            }
+        when (watchCommand.command.replace("\"", "").trim()) {
+            "pause" -> isPaused = true
+            "resume" -> isPaused = false
         }
     }
 
@@ -147,16 +171,16 @@ fun TrainingSession(
         sendMessageToWatch(context, "/session_end")
 
         saveTrainingSession(
-            context       = context,
-            goalType      = goalType,
-            goalValue     = goalValue,
-            difficulty    = difficulty,
+            context = context,
+            goalType = goalType,
+            goalValue = goalValue,
+            difficulty = difficulty,
             distanceMeters = watchResult.distanceMeters,
             elapsedSeconds = watchResult.elapsedSeconds,
-            endedEarly    = watchResult.endedEarly
+            endedEarly = watchResult.endedEarly
         )
 
-        delay(1200)
+        delay(1_200)
         onFinish(
             watchResult.distanceMeters,
             watchResult.elapsedSeconds,
@@ -164,22 +188,21 @@ fun TrainingSession(
         )
     }
 
-    val watchLevel by WatchDataRepository.level.collectAsState()
-    val watchProgress by WatchDataRepository.progress.collectAsState()
-
-    LaunchedEffect(watchLevel, watchProgress.progress) {
-        if (watchLevel > 0) musicLevel = watchLevel
+    LaunchedEffect(watchLevel) {
+        if (watchLevel > 0) {
+            musicLevel = watchLevel
+        }
     }
 
     val audioResId = when {
         !musicEnabled -> R.raw.footsteps
-        isJustVibing  -> R.raw.relaxing_music
+        isJustVibing -> R.raw.relaxing_music
         isOneMinuteMode -> R.raw.song5
         else -> when (musicLevel) {
-            1    -> R.raw.song1
-            2    -> R.raw.song2
-            3    -> R.raw.song3
-            4    -> R.raw.song4
+            1 -> R.raw.song1
+            2 -> R.raw.song2
+            3 -> R.raw.song3
+            4 -> R.raw.song4
             else -> R.raw.song5
         }
     }
@@ -187,20 +210,22 @@ fun TrainingSession(
     val shouldPlay = !isStarting && !isPaused
 
     DisposableEffect(audioResId) {
-        val player = MediaPlayer.create(context, audioResId).apply {
-            isLooping = true
-        }
+        val player = MediaPlayer.create(context, audioResId).apply { isLooping = true }
         mediaPlayer = player
 
         if (shouldPlay) {
-            try { player.start() } catch (e: Exception) {}
+            try {
+                player.start()
+            } catch (_: Exception) {
+            }
         }
 
         onDispose {
             try {
                 player.stop()
                 player.release()
-            } catch (e: Exception) {}
+            } catch (_: Exception) {
+            }
             mediaPlayer = null
         }
     }
@@ -214,8 +239,10 @@ fun TrainingSession(
                     player.pause()
                 }
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {
+        }
     }
+
     DisposableEffect(Unit) {
         onDispose {
             WatchDataRepository.clearSessionState()
@@ -227,7 +254,7 @@ fun TrainingSession(
             .fillMaxSize()
             .background(backgroundColor)
     ) {
-        if (isStarting && introTitle.isNotBlank() && introValue.isNotBlank()) {
+        if (isStarting) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -237,7 +264,7 @@ fun TrainingSession(
                 Text(
                     text = introTitle,
                     color = Color(0xFFFFCC00),
-                    fontSize = 60.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
@@ -246,7 +273,7 @@ fun TrainingSession(
                 Text(
                     text = introValue,
                     color = Color.White,
-                    fontSize = 60.sp,
+                    fontSize = 42.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -258,14 +285,16 @@ fun TrainingSession(
     }
 }
 
+/** Normalizes the session setup into the storage key used for history and personal bests. */
 private fun modeKey(goalType: String, goalValue: String): String {
     return if (goalType == "DISTANCE") {
-        if (goalValue.toGoalDistanceMeters() == 1000) "1 KM" else "${goalValue.toGoalDistanceMeters()} M"
+        "1 KM"
     } else {
         "${goalValue.extractNumber()} MIN"
     }
 }
 
+/** Saves the finished workout in shared preferences using the app's compact history format. */
 private fun saveTrainingSession(
     context: Context,
     goalType: String,
@@ -282,7 +311,7 @@ private fun saveTrainingSession(
     prefs.edit().putStringSet("sessions", oldSessions + newSession).apply()
 }
 
-
+/** Returns the best previous result for the current mode so training can announce it up front. */
 fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String): SavedSession? {
     val mode = modeKey(goalType, goalValue)
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
@@ -291,14 +320,16 @@ fun getPersonalBestForMode(context: Context, goalType: String, goalValue: String
         val parts = raw.split("|")
         when {
             parts.size == 4 && parts[3] == mode -> SavedSession(
-                date        = parts[0],
-                distanceKm  = parts[1].toFloatOrNull() ?: 0f,
+                date = parts[0],
+                distanceKm = parts[1].toFloatOrNull() ?: 0f,
                 timeSeconds = parts[2].toIntOrNull() ?: 0,
-                mode        = parts[3]
+                mode = parts[3]
             )
+
             else -> null
         }
     }
+
     return if (goalType == "DISTANCE") {
         modeSessions.filter { it.timeSeconds > 0 }.minByOrNull { it.timeSeconds }
     } else {
@@ -316,17 +347,19 @@ private fun String.toGoalDistanceMeters(): Int {
     }
 }
 
+private fun String.toDisplayGoalValue(): String {
+    return when (this) {
+        "1 KILOMETER" -> "1000 METERS"
+        else -> this
+    }
+}
+
 private fun estimateTargetSteps(targetDistanceMeters: Float): Int {
     val averageStrideMeters = 0.7f
     return (targetDistanceMeters / averageStrideMeters).toInt().coerceAtLeast(1)
 }
 
-private fun Int.toTimerText(): String {
-    val minutes = this / 60
-    val seconds = this % 60
-    return String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
-}
-
+/** Small helper for the phone-to-watch message protocol used during sessions. */
 private fun sendMessageToWatch(
     context: Context,
     path: String,
@@ -353,6 +386,7 @@ private data class SessionIntro(
     val speech: String
 )
 
+/** Builds the optional pre-session personal-best card shown and spoken before the workout starts. */
 private fun buildSessionIntro(
     goalType: String,
     goalValue: String,

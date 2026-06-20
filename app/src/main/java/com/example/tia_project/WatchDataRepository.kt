@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** Live progress snapshot pushed from the watch during an active session. */
 data class WatchProgress(
     val progress: Float = 0f,
     val level: Int = 1,
@@ -12,11 +13,13 @@ data class WatchProgress(
     val steps: Int = 0
 )
 
+/** Small command channel used to mirror pause/resume actions from the watch. */
 data class WatchCommand(
     val command: String = "",
     val timestamp: Long = 0L
 )
 
+/** Final session payload sent back by the watch when a workout ends. */
 data class WatchSessionResult(
     val distanceMeters: Float = 0f,
     val elapsedSeconds: Int = 0,
@@ -25,6 +28,12 @@ data class WatchSessionResult(
     val timestamp: Long = 0L
 )
 
+/**
+ * In-memory bridge between the wearable listener service and the phone UI.
+ *
+ * Screens collect these flows so they can react to watch events without
+ * talking to the Wear APIs directly.
+ */
 object WatchDataRepository {
     private val _progress = MutableStateFlow(WatchProgress())
     val progress: StateFlow<WatchProgress> = _progress.asStateFlow()

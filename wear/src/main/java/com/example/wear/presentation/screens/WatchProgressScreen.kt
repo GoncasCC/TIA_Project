@@ -27,6 +27,13 @@ import kotlinx.coroutines.launch
 
 private val PaceWarningColor = Color(0xFFE69F00)
 
+/**
+ * Main watch workout UI.
+ *
+ * Before the workout starts it shows the intro card; afterwards it becomes a
+ * gesture-driven progress indicator with special blinking states for pause,
+ * stop warnings, and pace-up coaching.
+ */
 @Composable
 fun WatchProgressScreen(
     progress: Float = 0.45f,
@@ -170,24 +177,24 @@ fun WatchProgressScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (!sessionStarted && introTitle.isNotBlank() && introValue.isNotBlank()) {
+        if (!sessionStarted) {
             Column(
                 modifier = Modifier.padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = introTitle,
+                    text = if (introTitle.isNotBlank()) introTitle else "GET READY",
                     color = Color(0xFFFFCC00),
-                    fontSize = 50.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = introValue,
+                    text = if (introValue.isNotBlank()) introValue else "",
                     color = Color.White,
-                    fontSize = 50.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )

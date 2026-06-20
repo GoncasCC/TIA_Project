@@ -29,11 +29,18 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/** Pages available in the progress carousel: personal best cards and period summaries. */
 sealed class Page {
     data class PBMode(val label: String, val value: String, val speech: String) : Page()
     data class StatsPeriod(val period: String) : Page()
 }
 
+/**
+ * Progress dashboard for reviewing saved sessions.
+ *
+ * The first pages focus on personal bests per mode and the remaining pages
+ * summarize total work across time periods.
+ */
 @Composable
 fun ProgressScreen(
     voiceoverEnabled: Boolean,
@@ -327,6 +334,7 @@ fun ProgressScreen(
     }
 }
 
+/** Persisted workout snapshot stored in shared preferences and reused across reports. */
 data class SavedSession(
     val date: String,
     val distanceKm: Float,
@@ -334,12 +342,14 @@ data class SavedSession(
     val mode: String = ""
 )
 
+/** Aggregated totals for one progress period page. */
 data class ProgressData(
     val totalDistanceKm: Float,
     val totalTimeSeconds: Int,
     val totalSessions: Int
 )
 
+/** Loads the lightweight session history format used by both progress and personal-best logic. */
 private fun loadSavedSessions(context: Context): List<SavedSession> {
     val prefs = context.getSharedPreferences("training_sessions", Context.MODE_PRIVATE)
     val rawSessions = prefs.getStringSet("sessions", emptySet()) ?: emptySet()
@@ -363,6 +373,7 @@ private fun loadSavedSessions(context: Context): List<SavedSession> {
     }
 }
 
+/** Filters session history by period and rolls it up into the totals shown on screen. */
 private fun calculateProgressForPeriod(
     period: String,
     sessions: List<SavedSession>

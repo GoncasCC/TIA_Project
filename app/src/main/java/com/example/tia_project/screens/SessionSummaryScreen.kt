@@ -25,8 +25,16 @@ import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/**
+ * Final phone summary shown after the watch reports that the workout ended.
+ *
+ * It highlights a new personal best when one was achieved, otherwise it falls
+ * back to the basic session result.
+ */
 @Composable
 fun SessionSummaryScreen(
+    goalType: String,
+    goalValue: String,
     distanceMeters: Float,
     timeSeconds: Int,
     isNewPersonalBest: Boolean,
@@ -41,7 +49,18 @@ fun SessionSummaryScreen(
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
 
     val minutes = timeSeconds / 60
-    val distanceText = "${distanceMeters.roundToInt()} M"
+    val seconds = timeSeconds % 60
+    val sessionDistanceText = "${distanceMeters.roundToInt()} M"
+    val recordValueText = if (goalType == "TIME") {
+        sessionDistanceText
+    } else {
+        String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    }
+    val modeLabelText = if (goalType == "TIME") {
+        "${goalValue.substringBefore(" ").toIntOrNull() ?: 1} MIN"
+    } else {
+        "1000 M"
+    }
 
     val vibrator = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -73,9 +92,11 @@ fun SessionSummaryScreen(
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
         if (isTtsReady && voiceoverEnabled) {
             delay(500)
-            val personalBestText = if (isNewPersonalBest) " New personal best." else ""
-            val speechText =
-                "Session finished. You did ${distanceMeters.roundToInt()} meters in $minutes minutes.$personalBestText Double tap to go back to menu."
+            val speechText = if (isNewPersonalBest) {
+                "Session finished. New personal best. $recordValueText. $modeLabelText mode. Double tap to go back to menu."
+            } else {
+                "Session finished. You did ${distanceMeters.roundToInt()} meters in $minutes minutes. Double tap to go back to menu."
+            }
             tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "summary_stats")
         }
     }
@@ -124,36 +145,52 @@ fun SessionSummaryScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Text(
-                text = distanceText,
-                color = textColor,
-                fontSize = 50.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
             if (isNewPersonalBest) {
                 Text(
                     text = "NEW PERSONAL BEST",
                     color = accentColor,
-                    fontSize = 28.sp,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = recordValueText,
+                    color = textColor,
+                    fontSize = 50.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = modeLabelText,
+                    color = textColor,
+                    fontSize = 42.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+                Text(
+                    text = sessionDistanceText,
+                    color = textColor,
+                    fontSize = 50.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Text(
-                text = "$minutes MIN",
-                color = textColor,
-                fontSize = 50.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+                Text(
+                    text = "$minutes MIN",
+                    color = textColor,
+                    fontSize = 50.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }

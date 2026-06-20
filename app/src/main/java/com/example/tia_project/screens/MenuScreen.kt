@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/** Main landing screen that routes the user into setup, progress, guide, or options. */
 @Composable
 fun MenuScreen(
     onStartNewSession: () -> Unit,
@@ -75,6 +76,11 @@ fun MenuScreen(
     )
 }
 
+/**
+ * Reusable menu shell for text-only option lists.
+ *
+ * It centralizes gesture handling, spoken prompts, and haptic feedback.
+ */
 @Composable
 private fun OptionTextMenuScreen(
     screenKey: String,

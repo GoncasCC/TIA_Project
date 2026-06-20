@@ -4,6 +4,10 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONObject
 
+/**
+ * Receives messages from the watch and normalizes them into repository updates
+ * that the Compose screens can observe.
+ */
 class PhoneWearListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

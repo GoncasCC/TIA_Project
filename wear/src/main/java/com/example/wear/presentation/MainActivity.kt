@@ -14,6 +14,7 @@ import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.app.ActivityCompat
@@ -32,8 +33,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Locale
-import kotlin.math.roundToInt
 
+/**
+ * Core watch workout engine.
+ *
+ * It reads sensors, estimates distance/cadence, drives the progress UI,
+ * applies workout coaching rules, and sends the final result back to the phone.
+ */
 class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnMessageReceivedListener {
 
     companion object {
@@ -45,6 +51,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         private const val PERSONAL_BEST_WARMUP_MS = 20_000L
         private const val PERSONAL_BEST_REMINDER_MS = 60_000L
         private const val COACHING_GAP_MS = 4_000L
+        private const val MAX_FEASIBLE_SPEED_MPS = 5.5f
     }
 
     private enum class PersonalBestFeedbackState {
@@ -56,7 +63,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var stepCounterSensor: Sensor? = null
     private var accelerometerSensor: Sensor? = null
     private var initialSteps: Float? = null
-    private var lastDetectedStepMs: Long = 0L
+    private var lastDetectedStepMs = 0L
 
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
@@ -67,7 +74,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var stopWarningSent = false
     private var lastStepsForStopCheck = 0
     private var sessionSteps = 0
-    private var personalBestReachedAnnounced = false
+    private var hasAlreadySecuredPersonalBest = false
     private var lastPersonalBestFeedbackState: PersonalBestFeedbackState? = null
     private var lastPersonalBestFeedbackMs = 0L
     private var lastCoachingSpeechMs = 0L
@@ -119,7 +126,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             val sessionActive by WearSessionRepository.sessionActive.collectAsState()
             val resetSignal by WearSessionRepository.resetSteps.collectAsState()
 
-            androidx.compose.runtime.LaunchedEffect(resetSignal) {
+            LaunchedEffect(resetSignal) {
                 if (resetSignal > 0L) {
                     resetSessionState()
                 }
@@ -154,17 +161,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                         }
                     },
                     onEndSession = {
-                        speakDirect("Finishing session.")
+                        val elapsedSeconds = elapsedSecondsForResult(session)
                         sendSessionResult(
                             distanceMeters = accumulatedDistanceMeters,
-                            elapsedSeconds = elapsedSecondsForResult(session),
+                            elapsedSeconds = elapsedSeconds,
                             endedEarly = true,
-                            isNewPersonalBest = isNewPersonalBestAtCompletion(
-                                session = session,
-                                distanceMeters = accumulatedDistanceMeters,
-                                elapsedSeconds = elapsedSecondsForResult(session),
-                                endedEarly = true
-                            )
+                            isNewPersonalBest = false
                         )
                         WearSessionRepository.setSessionActive(false)
                     },
@@ -204,9 +206,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             val json = org.json.JSONObject(String(messageEvent.data, Charsets.UTF_8))
             when (messageEvent.path) {
                 "/session_start" -> {
-                    val newGoalType = json.optString("goalType", "DISTANCE")
+                    resetSessionState()
                     val newSession = SessionData(
-                        goalType = newGoalType,
+                        goalType = json.optString("goalType", "DISTANCE"),
                         goalValue = json.optString("goalValue", "1 KILOMETER"),
                         difficulty = json.optString("difficulty", "JUST VIBING"),
                         targetSteps = json.optInt("targetSteps", 1).coerceAtLeast(1),
@@ -220,28 +222,23 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                     WearSessionRepository.triggerStepReset()
                     WearSessionRepository.update(newSession)
                     WearSessionRepository.setSessionActive(true)
-                    resetSessionState()
                 }
 
                 "/session_go" -> {
-                    val current = WearSessionRepository.session.value
-                    if (current.sessionStarted) return
-
+                    val session = WearSessionRepository.session.value
                     WearSessionRepository.update(
-                        current.copy(
+                        session.copy(
                             sessionStarted = true,
                             introTitle = "",
                             introValue = ""
                         )
                     )
-
                     sessionStartMs = System.currentTimeMillis()
                     sessionPausedAccumulatedMs = 0L
                     sessionPauseStartMs = 0L
                     startStopCheckLoop()
-
-                    if (current.goalType == "TIME") {
-                        startTimeGoalTimer(current.goalValue)
+                    if (session.goalType == "TIME") {
+                        startTimeGoalTimer(session.goalValue)
                     }
                 }
 
@@ -301,6 +298,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         val totalSteps = event.values[0]
         if (initialSteps == null) initialSteps = totalSteps
         sessionSteps = (totalSteps - (initialSteps ?: totalSteps)).toInt()
+
+        // Distance is estimated incrementally so both progress and pacing logic
+        // can react in near real time during the session.
         updateDistanceAndCadence(System.currentTimeMillis())
 
         val progress: Float
@@ -348,6 +348,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
+    /**
+     * Converts step input into an approximate distance using a cadence-based
+     * stride estimate. Faster cadence switches to a longer running stride.
+     */
     private fun updateDistanceAndCadence(now: Long) {
         if (cadenceWindowStartMs == 0L) {
             cadenceWindowStartMs = now
@@ -381,6 +385,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
+    /** Announces halfway/end-of-stage milestones for the feedback-driven difficulties. */
     private fun handleLevelFeedback(levelProgress: Float, level: Int) {
         if (!halfwayAnnounced && levelProgress >= 0.5f) {
             halfwayAnnounced = true
@@ -392,93 +397,122 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
+    /**
+     * Decides whether the user is still on track to beat their personal best
+     * and throttles how often that coaching can be repeated.
+     */
     private fun handlePersonalBestFeedback(session: SessionData) {
-        val pbDistanceMeters = session.personalBestDistanceKm * 1000f
-        val currentDistanceMeters = accumulatedDistanceMeters
+        val evaluation = evaluatePersonalBest(session)
 
-        if (
-            session.goalType == "TIME" &&
-            !personalBestReachedAnnounced &&
-            pbDistanceMeters > 0f &&
-            currentDistanceMeters > pbDistanceMeters
-        ) {
-            personalBestReachedAnnounced = true
-            updateNeedsSpeedUp(session, false)
-            announceCoaching(
-                text = "New personal best! ${currentDistanceMeters.roundToInt()} meters.",
-                vibrationType = "new_personal_best",
-                force = true
-            )
+        if (evaluation.alreadySecured) {
+            hasAlreadySecuredPersonalBest = true
+            updateNeedsSpeedUp(false)
+            lastPersonalBestFeedbackState = null
             return
         }
 
-        val state = evaluatePersonalBestFeedback(session) ?: run {
-            updateNeedsSpeedUp(session, false)
+        if (evaluation.state == null) {
+            updateNeedsSpeedUp(false)
+            lastPersonalBestFeedbackState = null
             return
         }
 
-        updateNeedsSpeedUp(session, state == PersonalBestFeedbackState.NEEDS_SPEED_UP)
+        updateNeedsSpeedUp(evaluation.state == PersonalBestFeedbackState.NEEDS_SPEED_UP)
 
         val now = System.currentTimeMillis()
         val shouldAnnounce =
-            state != lastPersonalBestFeedbackState ||
+            evaluation.state != lastPersonalBestFeedbackState ||
                     now - lastPersonalBestFeedbackMs >= PERSONAL_BEST_REMINDER_MS
 
         if (!shouldAnnounce) return
 
-        lastPersonalBestFeedbackState = state
+        lastPersonalBestFeedbackState = evaluation.state
         lastPersonalBestFeedbackMs = now
 
-        when (state) {
+        when (evaluation.state) {
             PersonalBestFeedbackState.ON_TRACK -> {
                 announceCoaching("You are on pace to beat your personal best. Keep it up.")
             }
 
             PersonalBestFeedbackState.NEEDS_SPEED_UP -> {
                 announceCoaching(
-                    text = "You can still beat your personal best if you speed up a little.",
-                    vibrationType = "pace_warning"
+                    "You can still beat your personal best if you speed up a little.",
+                    "pace_warning"
                 )
             }
         }
     }
 
-    private fun evaluatePersonalBestFeedback(session: SessionData): PersonalBestFeedbackState? {
+    /** Evaluates whether a personal-best warning is meaningful for the current session state. */
+    private fun evaluatePersonalBest(session: SessionData): PersonalBestEvaluation {
         val elapsedSeconds = realElapsedSeconds()
-        if (elapsedSeconds <= 0) return null
-        if (elapsedSeconds * 1000L < PERSONAL_BEST_WARMUP_MS) return null
+        if (elapsedSeconds <= 0) return PersonalBestEvaluation()
+        if (elapsedSeconds * 1000L < PERSONAL_BEST_WARMUP_MS) return PersonalBestEvaluation()
+        if (hasAlreadySecuredPersonalBest) return PersonalBestEvaluation(alreadySecured = true)
 
         return if (session.goalType == "DISTANCE") {
-            val personalBestSeconds = session.personalBestTimeSeconds
+            val pbTimeSeconds = session.personalBestTimeSeconds
             val targetDistanceMeters = goalValueToDistanceMeters(session.goalValue).toFloat()
-            if (personalBestSeconds <= 0 || targetDistanceMeters <= 0f || accumulatedDistanceMeters <= 0f) {
-                null
+            if (pbTimeSeconds <= 0 || accumulatedDistanceMeters <= 0f || targetDistanceMeters <= 0f) {
+                PersonalBestEvaluation()
             } else {
-                val projectedFinishSeconds =
-                    elapsedSeconds * (targetDistanceMeters / accumulatedDistanceMeters)
-                if (projectedFinishSeconds <= personalBestSeconds) {
-                    PersonalBestFeedbackState.ON_TRACK
+                val remainingDistance = targetDistanceMeters - accumulatedDistanceMeters
+                val remainingTimeToBeat = pbTimeSeconds - elapsedSeconds
+                if (remainingDistance <= 0f || remainingTimeToBeat <= 0) {
+                    PersonalBestEvaluation()
                 } else {
-                    PersonalBestFeedbackState.NEEDS_SPEED_UP
+                    val requiredSpeed = remainingDistance / remainingTimeToBeat.toFloat()
+                    if (requiredSpeed > MAX_FEASIBLE_SPEED_MPS) {
+                        PersonalBestEvaluation()
+                    } else {
+                        val projectedFinishSeconds =
+                            elapsedSeconds * (targetDistanceMeters / accumulatedDistanceMeters)
+                        PersonalBestEvaluation(
+                            state = if (projectedFinishSeconds <= pbTimeSeconds) {
+                                PersonalBestFeedbackState.ON_TRACK
+                            } else {
+                                PersonalBestFeedbackState.NEEDS_SPEED_UP
+                            }
+                        )
+                    }
                 }
             }
         } else {
-            val personalBestDistanceMeters = session.personalBestDistanceKm * 1000f
+            val pbDistanceMeters = session.personalBestDistanceKm * 1000f
             val totalGoalSeconds = session.goalValue.extractNumber() * 60
-            if (personalBestDistanceMeters <= 0f || totalGoalSeconds <= 0 || accumulatedDistanceMeters <= 0f) {
-                null
+            if (pbDistanceMeters <= 0f || totalGoalSeconds <= 0 || accumulatedDistanceMeters <= 0f) {
+                PersonalBestEvaluation()
+            } else if (accumulatedDistanceMeters >= pbDistanceMeters) {
+                PersonalBestEvaluation(alreadySecured = true)
             } else {
-                val projectedFinishDistanceMeters =
-                    (accumulatedDistanceMeters / elapsedSeconds.toFloat()) * totalGoalSeconds
-                if (projectedFinishDistanceMeters >= personalBestDistanceMeters) {
-                    PersonalBestFeedbackState.ON_TRACK
+                val remainingSeconds = totalGoalSeconds - elapsedSeconds
+                val remainingDistance = pbDistanceMeters - accumulatedDistanceMeters
+                if (remainingSeconds <= 0 || remainingDistance <= 0f) {
+                    PersonalBestEvaluation()
                 } else {
-                    PersonalBestFeedbackState.NEEDS_SPEED_UP
+                    val requiredSpeed = remainingDistance / remainingSeconds.toFloat()
+                    if (requiredSpeed > MAX_FEASIBLE_SPEED_MPS) {
+                        PersonalBestEvaluation()
+                    } else {
+                        val projectedFinishDistance =
+                            (accumulatedDistanceMeters / elapsedSeconds.toFloat()) * totalGoalSeconds
+                        PersonalBestEvaluation(
+                            state = if (projectedFinishDistance >= pbDistanceMeters) {
+                                PersonalBestFeedbackState.ON_TRACK
+                            } else {
+                                PersonalBestFeedbackState.NEEDS_SPEED_UP
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
+    /**
+     * Monitors inactivity so the watch can blink/vibrate when the user has not
+     * really started yet or has stopped mid-session.
+     */
     private fun startStopCheckLoop() {
         stopCheckJob?.cancel()
         stopCheckJob = scope.launch {
@@ -549,19 +583,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
-    private fun announceCoaching(
-        text: String,
-        vibrationType: String? = null,
-        force: Boolean = false
-    ) {
-        val shouldSpeak = WearSessionRepository.session.value.voiceoverEnabled && isTtsReady
-        if (!force && shouldSpeak && !canSpeakCoaching()) return
-
+    /** Centralized coaching output so haptics and TTS stay aligned. */
+    private fun announceCoaching(text: String, vibrationType: String? = null) {
         if (vibrationType != null) {
             vibrate(vibrationType)
         }
 
-        if (!shouldSpeak) return
+        val session = WearSessionRepository.session.value
+        if (!session.voiceoverEnabled || !isTtsReady || !canSpeakCoaching()) return
 
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text.hashCode().toString())
         lastCoachingSpeechMs = System.currentTimeMillis()
@@ -572,7 +601,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         return tts?.isSpeaking != true && now - lastCoachingSpeechMs >= COACHING_GAP_MS
     }
 
-    private fun updateNeedsSpeedUp(session: SessionData, needsSpeedUp: Boolean) {
+    private fun updateNeedsSpeedUp(needsSpeedUp: Boolean) {
+        val session = WearSessionRepository.session.value
         if (session.needsSpeedUp != needsSpeedUp) {
             WearSessionRepository.update(session.copy(needsSpeedUp = needsSpeedUp))
         }
@@ -580,8 +610,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
     private fun realElapsedSeconds(): Int {
         if (sessionStartMs == 0L) return 0
-        val pausedNow =
-            if (sessionPauseStartMs > 0L) System.currentTimeMillis() - sessionPauseStartMs else 0L
+        val pausedNow = if (sessionPauseStartMs > 0L) {
+            System.currentTimeMillis() - sessionPauseStartMs
+        } else {
+            0L
+        }
         val activeMs =
             (System.currentTimeMillis() - sessionStartMs) - sessionPausedAccumulatedMs - pausedNow
         return (activeMs / 1000L).coerceAtLeast(0L).toInt()
@@ -590,47 +623,31 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private fun elapsedSecondsForResult(session: SessionData): Int {
         return if (session.goalType == "TIME") {
             val targetSeconds = session.goalValue.extractNumber() * 60
-            if (session.sessionStarted) {
-                (session.progress * targetSeconds).toInt()
-            } else {
-                0
-            }
+            (session.progress * targetSeconds).toInt()
         } else {
             realElapsedSeconds()
         }
     }
 
-    private fun isNewPersonalBestAtCompletion(
-        session: SessionData,
-        distanceMeters: Float,
-        elapsedSeconds: Int,
-        endedEarly: Boolean
-    ): Boolean {
-        if (endedEarly) return false
-
-        return if (session.goalType == "DISTANCE") {
-            session.personalBestTimeSeconds == 0 || elapsedSeconds < session.personalBestTimeSeconds
-        } else {
-            val personalBestDistanceMeters = session.personalBestDistanceKm * 1000f
-            personalBestDistanceMeters == 0f || distanceMeters > personalBestDistanceMeters
-        }
-    }
-
+    /** Finalizes a completed workout and computes whether it set a new personal best. */
     private fun onSessionComplete(session: SessionData) {
         stopCheckJob?.cancel()
-        val distanceMeters = accumulatedDistanceMeters
         val elapsedSeconds = if (session.goalType == "TIME") {
             session.goalValue.extractNumber() * 60
         } else {
             realElapsedSeconds()
         }
-        val isNewPersonalBest =
-            isNewPersonalBestAtCompletion(session, distanceMeters, elapsedSeconds, endedEarly = false)
+        val isNewPersonalBest = if (session.goalType == "TIME") {
+            val previousBestMeters = session.personalBestDistanceKm * 1000f
+            previousBestMeters == 0f || accumulatedDistanceMeters > previousBestMeters
+        } else {
+            session.personalBestTimeSeconds == 0 || elapsedSeconds < session.personalBestTimeSeconds
+        }
 
         vibrate("session_complete")
         speakDirect("Workout complete.")
         sendSessionResult(
-            distanceMeters = distanceMeters,
+            distanceMeters = accumulatedDistanceMeters,
             elapsedSeconds = elapsedSeconds,
             endedEarly = false,
             isNewPersonalBest = isNewPersonalBest
@@ -687,7 +704,6 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             "stop_warning" -> longArrayOf(0, 400, 100, 400, 100, 400)
             "session_complete" -> longArrayOf(0, 150, 80, 150, 80, 350)
             "pace_warning" -> longArrayOf(0, 120, 80, 120)
-            "new_personal_best" -> longArrayOf(0, 140, 70, 140, 70, 260)
             else -> longArrayOf(0, 100)
         }
 
@@ -713,7 +729,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         stopWarningSent = false
         lastStepsForStopCheck = 0
         sessionSteps = 0
-        personalBestReachedAnnounced = false
+        hasAlreadySecuredPersonalBest = false
         lastPersonalBestFeedbackState = null
         lastPersonalBestFeedbackMs = 0L
         lastCoachingSpeechMs = 0L
@@ -734,6 +750,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         sessionPauseStartMs = 0L
     }
 
+    /** Drives the timer-based modes where progress advances with time instead of distance. */
     private fun startTimeGoalTimer(goalValue: String) {
         timerJob?.cancel()
         timerStartMs = System.currentTimeMillis()
@@ -748,12 +765,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             while (isActive && WearSessionRepository.sessionActive.value) {
                 val session = WearSessionRepository.session.value
 
-                if (!session.sessionStarted) {
-                    delay(200L)
-                    continue
-                }
-
-                if (session.paused) {
+                if (!session.sessionStarted || session.paused) {
                     delay(200L)
                     continue
                 }
@@ -761,9 +773,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
                 val elapsedMs = timerElapsedBeforePause + (System.currentTimeMillis() - timerStartMs)
                 val elapsedSeconds = (elapsedMs / 1000L).coerceAtMost(totalSeconds)
                 val progress = (elapsedSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f)
-                val level = ((elapsedSeconds / secondsPerLevel) + 1)
-                    .coerceIn(1, totalLevels)
-                    .toInt()
+                val level = ((elapsedSeconds / secondsPerLevel) + 1).coerceIn(1, totalLevels).toInt()
 
                 val updatedSession = session.copy(progress = progress, level = level)
                 WearSessionRepository.update(updatedSession)
@@ -777,8 +787,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
 
                 if (updatedSession.difficulty != "JUST VIBING") {
                     val secondsIntoLevel = elapsedSeconds % secondsPerLevel
-                    val levelProgress =
-                        (secondsIntoLevel.toFloat() / secondsPerLevel).coerceIn(0f, 1f)
+                    val levelProgress = (secondsIntoLevel.toFloat() / secondsPerLevel).coerceIn(0f, 1f)
                     handleLevelFeedback(levelProgress, level)
                 }
 
@@ -803,4 +812,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             else -> goalValue.extractNumber() * 1000
         }
     }
+
+    private data class PersonalBestEvaluation(
+        val state: PersonalBestFeedbackState? = null,
+        val alreadySecured: Boolean = false
+    )
 }

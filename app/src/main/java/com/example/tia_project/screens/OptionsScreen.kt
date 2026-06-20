@@ -27,6 +27,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/** Settings screen for audio, vibration, and visual accessibility preferences. */
 @Composable
 fun OptionsScreen(
     voiceoverEnabled: Boolean,
@@ -260,6 +261,7 @@ fun OptionsScreen(
     }
 }
 
+/** Renders the currently selected setting as a large two-state card. */
 @Composable
 private fun OptionsLayout(
     selectedOption: String,

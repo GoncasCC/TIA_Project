@@ -11,6 +11,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 
+/** Idle watch screen shown while waiting for the phone to start a new session. */
 @Composable
 fun WaitingScreen() {
     Box(

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Locale
 
+/** Ordered tutorial steps for the gesture and workout-mode onboarding flow. */
 private enum class GuideStep {
     SWIPE,
     DOUBLE_TAP,
@@ -37,6 +38,10 @@ private enum class GuideStep {
     FINISHED
 }
 
+/**
+ * Interactive onboarding screen that teaches the gesture vocabulary and the
+ * meaning of each training mode.
+ */
 @Composable
 fun GuideScreen(
     voiceoverEnabled: Boolean,
@@ -156,7 +161,7 @@ fun GuideScreen(
             )
 
             GuideStep.HARDMODE -> speak(
-                "Pushing Limits is the most intense mode. Just like Starting to Sweat, the music changes as you advance to show your progress towards the end, but the system also encourages you to improve your pace and beat your personal best. You can disable the music and hear footsteps instead. Double tap to finish the guide.",
+                "Pushing Limits is the most intense mode. Just like Starting to Sweat, the music changes as you advance to show your progress towards the end, but the system also encourages you to improve your pace and beat your personal best. For the distance mode, the target is 1000 meters. You can disable the music and hear footsteps instead. Double tap to finish the guide.",
                 "guide_modes"
             )
 
@@ -292,6 +297,7 @@ fun GuideScreen(
     }
 }
 
+/** Visual card used by the guide when explaining each workout intensity. */
 @Composable
 private fun GuideTrainingLayout(
     step: GuideStep,
