@@ -38,7 +38,8 @@ fun MenuScreen(
     onOptions: () -> Unit,
     voiceoverEnabled: Boolean,
     vibrationEnabled: Boolean,
-    darkModeEnabled: Boolean
+    darkModeEnabled: Boolean,
+    onExitAppRequest: () -> Unit
 ) {
     OptionTextMenuScreen(
         screenKey = "mainMenu",
@@ -65,6 +66,7 @@ fun MenuScreen(
                 else -> "Selected."
             }
         },
+        onExitAppRequest = onExitAppRequest,
         onNext = { option ->
             when (option) {
                 "START NEW SESSION" -> onStartNewSession()
@@ -91,6 +93,7 @@ private fun OptionTextMenuScreen(
     darkModeEnabled: Boolean,
     speechForOption: (String) -> String,
     selectSpeechForOption: (String) -> String,
+    onExitAppRequest: () -> Unit,
     onNext: (String) -> Unit
 ) {
     var selectedIndex by remember { mutableStateOf(0) }
@@ -172,22 +175,24 @@ private fun OptionTextMenuScreen(
     }
 
     LaunchedEffect(isTtsReady, voiceoverEnabled) {
-        if (isTtsReady && voiceoverEnabled && !hasAnnouncedMenuEntry) {
+        if (!hasAnnouncedMenuEntry) {
             hasAnnouncedMenuEntry = true
 
-            tts?.speak(
-                "You are in the menu.",
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "menu_entered"
-            )
+            if (isTtsReady && voiceoverEnabled) {
+                tts?.speak(
+                    "You are in the menu.",
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "menu_entered"
+                )
 
-            tts?.speak(
-                speechForOption(selectedOption),
-                TextToSpeech.QUEUE_ADD,
-                null,
-                "menu_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
-            )
+                tts?.speak(
+                    speechForOption(selectedOption),
+                    TextToSpeech.QUEUE_ADD,
+                    null,
+                    "menu_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
+                )
+            }
         }
     }
 
@@ -232,6 +237,10 @@ private fun OptionTextMenuScreen(
                                     waitForSpeechToFinish()
                                     onNext(chosen)
                                 }
+                            },
+                            onLongPress = {
+                                if (isNavigating) return@detectTapGestures
+                                onExitAppRequest()
                             }
                         )
                     }

@@ -1,6 +1,7 @@
 package com.example.wear.presentation
 
 import android.Manifest
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -13,10 +14,25 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.wear.presentation.screens.WaitingScreen
@@ -95,10 +111,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var sessionStartMs = 0L
     private var sessionPausedAccumulatedMs = 0L
     private var sessionPauseStartMs = 0L
+    private lateinit var watchPrefs: SharedPreferences
+    private var showExitPrompt by mutableStateOf(false)
+    private var pendingIdleAnnouncement by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        watchPrefs = getSharedPreferences("wear_app_preferences", MODE_PRIVATE)
 
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -126,53 +146,89 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             val sessionActive by WearSessionRepository.sessionActive.collectAsState()
             val resetSignal by WearSessionRepository.resetSteps.collectAsState()
 
+            BackHandler(enabled = true) {
+                if (showExitPrompt) {
+                    showExitPrompt = false
+                }
+            }
+
             LaunchedEffect(resetSignal) {
                 if (resetSignal > 0L) {
                     resetSessionState()
                 }
             }
 
-            if (!sessionActive) {
-                WaitingScreen()
-            } else {
-                WatchProgressScreen(
-                    progress = session.progress,
-                    level = session.level,
-                    sessionStarted = session.sessionStarted,
-                    paused = session.paused,
-                    isStopped = session.isStopped,
-                    difficulty = session.difficulty,
-                    needsSpeedUp = session.needsSpeedUp,
-                    introTitle = session.introTitle,
-                    introValue = session.introValue,
-                    vibrationEnabled = session.vibrationEnabled,
-                    onPauseToggle = {
-                        if (session.sessionStarted) {
-                            val newPaused = !session.paused
-                            WearSessionRepository.update(session.copy(paused = newPaused))
-                            sendCommandToPhone(if (newPaused) "pause" else "resume")
-                        }
-                    },
-                    onResume = {
-                        if (session.sessionStarted) {
-                            WearSessionRepository.update(session.copy(paused = false))
-                            sendCommandToPhone("resume")
-                            speakDirect("Returning to session.")
-                        }
-                    },
-                    onEndSession = {
-                        val elapsedSeconds = elapsedSecondsForResult(session)
-                        sendSessionResult(
-                            distanceMeters = accumulatedDistanceMeters,
-                            elapsedSeconds = elapsedSeconds,
-                            endedEarly = true,
-                            isNewPersonalBest = false
-                        )
-                        WearSessionRepository.setSessionActive(false)
-                    },
-                    onSpeakRequest = { text -> speakDirect(text) },
-                    onStopSpeaking = { tts?.stop() }
-                )
+            LaunchedEffect(sessionActive, pendingIdleAnnouncement, isTtsReady, showExitPrompt) {
+                val announcement = pendingIdleAnnouncement ?: return@LaunchedEffect
+                if (!sessionActive && !showExitPrompt && isTtsReady) {
+                    speakAppMessage(announcement)
+                    pendingIdleAnnouncement = null
+                }
+            }
+
+            LaunchedEffect(sessionActive) {
+                if (sessionActive) {
+                    showExitPrompt = false
+                    pendingIdleAnnouncement = null
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                if (!sessionActive) {
+                    WaitingScreen(
+                        onExitRequest = { requestExitPrompt() }
+                    )
+                } else {
+                    WatchProgressScreen(
+                        progress = session.progress,
+                        level = session.level,
+                        sessionStarted = session.sessionStarted,
+                        paused = session.paused,
+                        isStopped = session.isStopped,
+                        difficulty = session.difficulty,
+                        needsSpeedUp = session.needsSpeedUp,
+                        introTitle = session.introTitle,
+                        introValue = session.introValue,
+                        vibrationEnabled = session.vibrationEnabled,
+                        onPauseToggle = {
+                            if (session.sessionStarted) {
+                                val newPaused = !session.paused
+                                WearSessionRepository.update(session.copy(paused = newPaused))
+                                sendCommandToPhone(if (newPaused) "pause" else "resume")
+                            }
+                        },
+                        onResume = {
+                            if (session.sessionStarted) {
+                                WearSessionRepository.update(session.copy(paused = false))
+                                sendCommandToPhone("resume")
+                                speakDirect("Returning to session.")
+                            }
+                        },
+                        onEndSession = {
+                            val elapsedSeconds = elapsedSecondsForResult(session)
+                            sendSessionResult(
+                                distanceMeters = accumulatedDistanceMeters,
+                                elapsedSeconds = elapsedSeconds,
+                                endedEarly = true,
+                                isNewPersonalBest = false
+                            )
+                            WearSessionRepository.setSessionActive(false)
+                        },
+                        onSpeakRequest = { text -> speakDirect(text) },
+                        onStopSpeaking = { tts?.stop() }
+                    )
+                }
+
+                if (showExitPrompt) {
+                    ExitAppPrompt(
+                        onStay = { stayInApp() },
+                        onExit = { exitApp() }
+                    )
+                }
             }
         }
     }
@@ -193,12 +249,24 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         accelerometerSensor?.also { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
         }
+        showExitPrompt = false
+
+        if (!WearSessionRepository.sessionActive.value) {
+            val hasOpenedBefore = watchPrefs.getBoolean("watch_has_opened_before", false)
+            pendingIdleAnnouncement = if (hasOpenedBefore) {
+                "Welcome back."
+            } else {
+                watchPrefs.edit().putBoolean("watch_has_opened_before", true).apply()
+                "Welcome."
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
         Wearable.getMessageClient(this).removeListener(this)
         sensorManager.unregisterListener(this)
+        showExitPrompt = false
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -207,6 +275,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
             when (messageEvent.path) {
                 "/session_start" -> {
                     resetSessionState()
+                    showExitPrompt = false
+                    pendingIdleAnnouncement = null
                     val newSession = SessionData(
                         goalType = json.optString("goalType", "DISTANCE"),
                         goalValue = json.optString("goalValue", "1 KILOMETER"),
@@ -698,6 +768,34 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
     }
 
+    private fun speakAppMessage(text: String) {
+        if (isTtsReady) {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text.hashCode().toString())
+        }
+    }
+
+    private fun requestExitPrompt() {
+        showExitPrompt = true
+        vibrate("nudge")
+        speakAppMessage("Leaving app. Tap once to stay. Double tap to exit.")
+    }
+
+    private fun stayInApp() {
+        showExitPrompt = false
+        vibrate("nudge")
+        speakAppMessage("Staying in app.")
+    }
+
+    private fun exitApp() {
+        showExitPrompt = false
+        scope.launch {
+            vibrate("nudge")
+            speakAppMessage("Leaving app.")
+            delay(if (isTtsReady) 700L else 250L)
+            finish()
+        }
+    }
+
     private fun vibrate(type: String) {
         if (!WearSessionRepository.session.value.vibrationEnabled) return
 
@@ -821,4 +919,31 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         val state: PersonalBestFeedbackState? = null,
         val alreadySecured: Boolean = false
     )
+}
+
+@Composable
+private fun ExitAppPrompt(
+    onStay: () -> Unit,
+    onExit: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onStay() },
+                    onDoubleTap = { onExit() }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.wear.compose.material.Text(
+            text = "LEAVING APP",
+            color = Color(0xFFFFCC00),
+            fontSize = 40.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
 }
