@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         private const val PERSONAL_BEST_REMINDER_MS = 60_000L
         private const val COACHING_GAP_MS = 4_000L
         private const val MAX_FEASIBLE_SPEED_MPS = 5.5f
+        private const val IDLE_GREETING_THROTTLE_MS = 3_000L
     }
 
     private enum class PersonalBestFeedbackState {
@@ -111,6 +112,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private var sessionStartMs = 0L
     private var sessionPausedAccumulatedMs = 0L
     private var sessionPauseStartMs = 0L
+    private var lastIdleGreetingScheduledMs = 0L
     private lateinit var watchPrefs: SharedPreferences
     private var showExitPrompt by mutableStateOf(false)
     private var pendingIdleAnnouncement by mutableStateOf<String?>(null)
@@ -251,8 +253,20 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
         }
         showExitPrompt = false
 
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
         if (!WearSessionRepository.sessionActive.value) {
+            val now = System.currentTimeMillis()
+            if (now - lastIdleGreetingScheduledMs < IDLE_GREETING_THROTTLE_MS) {
+                return
+            }
+
             val hasOpenedBefore = watchPrefs.getBoolean("watch_has_opened_before", false)
+            lastIdleGreetingScheduledMs = now
             pendingIdleAnnouncement = if (hasOpenedBefore) {
                 "Welcome back."
             } else {
