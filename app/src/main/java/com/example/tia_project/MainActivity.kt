@@ -116,9 +116,11 @@ class MainActivity : ComponentActivity() {
 
 
             var hasAnnouncedEntryGreeting by remember { mutableStateOf(false) }
+            val shouldPlayReturningMenuGreeting =
+                currentScreen == "menu" && hasSeenGuide && !hasAnnouncedEntryGreeting
 
-            LaunchedEffect(currentScreen, isAppTtsReady) {
-                if (currentScreen == "menu" && isAppTtsReady && hasSeenGuide && !hasAnnouncedEntryGreeting) {
+            LaunchedEffect(shouldPlayReturningMenuGreeting, isAppTtsReady) {
+                if (shouldPlayReturningMenuGreeting && isAppTtsReady) {
                     hasAnnouncedEntryGreeting = true
                     speakAppMessage("Welcome back.", flush = true)
                     speakAppMessage("You are currently in the menu.", flush = false)
@@ -195,7 +197,7 @@ class MainActivity : ComponentActivity() {
                             vibrationEnabled = vibrationEnabled,
                             darkModeEnabled = darkModeEnabled,
                             onExitAppRequest = { requestExitPrompt() },
-                            skipInitialMenuAnnouncement = hasSeenGuide && hasAnnouncedEntryGreeting
+                            skipInitialMenuAnnouncement = shouldPlayReturningMenuGreeting
                         )
                     }
 
