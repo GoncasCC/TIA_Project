@@ -151,7 +151,7 @@ fun GuideScreen(
             )
 
             GuideStep.EASYMODE -> speak(
-                "Now let's learn about the exercise modes. You can choose one of three modes. Just Vibing is the easiest mode. It is designed for relaxed physical activity, with no progress feedback during the session. You will hear relaxing music, or footsteps if music is disabled. Double tap to continue.",
+                "Good. Now let's learn about the exercise modes. You can choose one of three modes. Just Vibing is the easiest mode. It is designed for relaxed physical activity, with no progress feedback during the session. You will hear relaxing music, or footsteps if music is disabled. Double tap to continue.",
                 "guide_modes"
             )
 
