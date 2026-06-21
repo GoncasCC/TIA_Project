@@ -39,44 +39,47 @@ fun MenuScreen(
     voiceoverEnabled: Boolean,
     vibrationEnabled: Boolean,
     darkModeEnabled: Boolean,
-    onExitAppRequest: () -> Unit
-) {
-    OptionTextMenuScreen(
-        screenKey = "mainMenu",
-        options = listOf("START NEW SESSION", "PROGRESS", "GUIDE", "OPTIONS"),
-        title = "MENU",
-        voiceoverEnabled = voiceoverEnabled,
-        vibrationEnabled = vibrationEnabled,
-        darkModeEnabled = darkModeEnabled,
-        speechForOption = { option ->
-            when (option) {
-                "START NEW SESSION" -> "Let's start a new session."
-                "PROGRESS" -> "Check your progress."
-                "GUIDE" -> "Consult the guide."
-                "OPTIONS" -> "Change options."
-                else -> option.toReadableMenuText()
-            }
-        },
-        selectSpeechForOption = { option ->
-            when (option) {
-                "START NEW SESSION" -> "Starting a new session."
-                "PROGRESS" -> "Opening progress."
-                "GUIDE" -> "Opening the guide."
-                "OPTIONS" -> "Opening options."
-                else -> "Selected."
-            }
-        },
-        onExitAppRequest = onExitAppRequest,
-        onNext = { option ->
-            when (option) {
-                "START NEW SESSION" -> onStartNewSession()
-                "PROGRESS" -> onProgress()
-                "GUIDE" -> onGuide()
-                "OPTIONS" -> onOptions()
-            }
-        }
-    )
-}
+    onExitAppRequest: () -> Unit,
+    skipInitialMenuAnnouncement: Boolean = false
+)
+ {
+     OptionTextMenuScreen(
+         screenKey = "mainMenu",
+         options = listOf("START NEW SESSION", "PROGRESS", "GUIDE", "OPTIONS"),
+         title = "MENU",
+         voiceoverEnabled = voiceoverEnabled,
+         vibrationEnabled = vibrationEnabled,
+         darkModeEnabled = darkModeEnabled,
+         speechForOption = { option ->
+             when (option) {
+                 "START NEW SESSION" -> "Let's start a new session."
+                 "PROGRESS" -> "Check your progress."
+                 "GUIDE" -> "Consult the guide."
+                 "OPTIONS" -> "Change options."
+                 else -> option.toReadableMenuText()
+             }
+         },
+         selectSpeechForOption = { option ->
+             when (option) {
+                 "START NEW SESSION" -> "Starting a new session."
+                 "PROGRESS" -> "Opening progress."
+                 "GUIDE" -> "Opening the guide."
+                 "OPTIONS" -> "Opening options."
+                 else -> "Selected."
+             }
+         },
+         onExitAppRequest = onExitAppRequest,
+         onNext = { option ->
+             when (option) {
+                 "START NEW SESSION" -> onStartNewSession()
+                 "PROGRESS" -> onProgress()
+                 "GUIDE" -> onGuide()
+                 "OPTIONS" -> onOptions()
+             }
+         },
+         skipInitialAnnouncement = skipInitialMenuAnnouncement
+     )
+ }
 
 /**
  * Reusable menu shell for text-only option lists.
@@ -94,8 +97,10 @@ private fun OptionTextMenuScreen(
     speechForOption: (String) -> String,
     selectSpeechForOption: (String) -> String,
     onExitAppRequest: () -> Unit,
-    onNext: (String) -> Unit
-) {
+    onNext: (String) -> Unit,
+    skipInitialAnnouncement: Boolean = false
+)
+ {
     var selectedIndex by remember { mutableStateOf(0) }
     var dragAmountTotal by remember { mutableStateOf(0f) }
     var hasChangedOptionThisSwipe by remember { mutableStateOf(false) }
@@ -174,29 +179,32 @@ private fun OptionTextMenuScreen(
         }
     }
 
-    LaunchedEffect(isTtsReady, voiceoverEnabled) {
-        if (!hasAnnouncedMenuEntry) {
-            hasAnnouncedMenuEntry = true
+     LaunchedEffect(isTtsReady, voiceoverEnabled, skipInitialAnnouncement) {
+         if (!hasAnnouncedMenuEntry) {
+             hasAnnouncedMenuEntry = true
 
-            if (isTtsReady && voiceoverEnabled) {
-                tts?.speak(
-                    "You are in the menu.",
-                    TextToSpeech.QUEUE_FLUSH,
-                    null,
-                    "menu_entered"
-                )
+             if (skipInitialAnnouncement) return@LaunchedEffect
 
-                tts?.speak(
-                    speechForOption(selectedOption),
-                    TextToSpeech.QUEUE_ADD,
-                    null,
-                    "menu_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
-                )
-            }
-        }
-    }
+             if (isTtsReady && voiceoverEnabled) {
+                 tts?.speak(
+                     "You are in the menu.",
+                     TextToSpeech.QUEUE_FLUSH,
+                     null,
+                     "menu_entered"
+                 )
 
-    LaunchedEffect(selectedIndex, isTtsReady, voiceoverEnabled) {
+                 tts?.speak(
+                     speechForOption(selectedOption),
+                     TextToSpeech.QUEUE_ADD,
+                     null,
+                     "menu_${screenKey}_${selectedOption.lowercase().replace(" ", "_")}"
+                 )
+             }
+         }
+     }
+
+
+     LaunchedEffect(selectedIndex, isTtsReady, voiceoverEnabled) {
         if (isTtsReady && voiceoverEnabled && hasAnnouncedMenuEntry) {
             speakFlush(
                 speechForOption(selectedOption),

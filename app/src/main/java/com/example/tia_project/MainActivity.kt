@@ -107,9 +107,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            fun speakAppMessage(text: String) {
+            fun speakAppMessage(text: String, flush: Boolean = true) {
                 if (voiceoverEnabled && isAppTtsReady) {
-                    appTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text.hashCode().toString())
+                    val queueMode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+                    appTts?.speak(text, queueMode, null, text.hashCode().toString())
+                }
+            }
+
+
+            var hasAnnouncedEntryGreeting by remember { mutableStateOf(false) }
+
+            LaunchedEffect(currentScreen, isAppTtsReady) {
+                if (currentScreen == "menu" && isAppTtsReady && hasSeenGuide && !hasAnnouncedEntryGreeting) {
+                    hasAnnouncedEntryGreeting = true
+                    speakAppMessage("Welcome back.", flush = true)
+                    speakAppMessage("You are currently in the menu.", flush = false)
+                    speakAppMessage("Let's start a new session.", flush = false)
                 }
             }
 
@@ -181,7 +194,8 @@ class MainActivity : ComponentActivity() {
                             voiceoverEnabled = voiceoverEnabled,
                             vibrationEnabled = vibrationEnabled,
                             darkModeEnabled = darkModeEnabled,
-                            onExitAppRequest = { requestExitPrompt() }
+                            onExitAppRequest = { requestExitPrompt() },
+                            skipInitialMenuAnnouncement = hasSeenGuide && hasAnnouncedEntryGreeting
                         )
                     }
 
