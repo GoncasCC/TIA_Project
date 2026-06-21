@@ -777,7 +777,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, MessageClient.OnM
     private fun requestExitPrompt() {
         showExitPrompt = true
         vibrate("nudge")
-        speakAppMessage("Leaving app. Tap once to stay. Double tap to exit.")
+        speakAppMessage("Leaving app? Tap once to stay. Double tap to exit.")
     }
 
     private fun stayInApp() {

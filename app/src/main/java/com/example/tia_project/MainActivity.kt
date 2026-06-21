@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity() {
             fun requestExitPrompt() {
                 showExitPrompt = true
                 vibrateExitPrompt()
-                speakAppMessage("Leaving app. Tap once to stay. Double tap to exit.")
+                speakAppMessage("Leaving app? Tap once to stay. Double tap to exit.")
             }
 
             fun stayInApp() {
@@ -333,7 +333,7 @@ private fun ExitAppOverlay(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "LEAVING APP",
+            text = "LEAVING APP?",
             color = accentColor,
             fontSize = 50.sp,
             fontWeight = FontWeight.Bold,
