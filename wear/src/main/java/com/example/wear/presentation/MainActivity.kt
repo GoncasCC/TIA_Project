@@ -939,7 +939,7 @@ private fun ExitAppPrompt(
         contentAlignment = Alignment.Center
     ) {
         androidx.wear.compose.material.Text(
-            text = "LEAVING APP",
+            text = "LEAVING APP?",
             color = Color(0xFFFFCC00),
             fontSize = 40.sp,
             fontWeight = FontWeight.Bold,
