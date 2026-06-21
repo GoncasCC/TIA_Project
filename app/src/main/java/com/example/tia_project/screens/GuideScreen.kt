@@ -146,7 +146,7 @@ fun GuideScreen(
             )
 
             GuideStep.LONG_PRESS -> speak(
-                "Good. Two finger swipe goes back. Now long press to cancel a new session.",
+                "Good. Two finger swipe goes back. Now, long press does different things depending on where you are and which device you are using. If you are on the smartphone setting up a new session, it cancels that setup. If you are on the smartwatch in a workout, it ends the session. If you are on the smartphone menu, it opens the option to leave the app. Long press to test.\n",
                 "guide_long_press"
             )
 
