@@ -136,12 +136,12 @@ fun GuideScreen(
             )
 
             GuideStep.DOUBLE_TAP -> speak(
-                "Good. Swipe changes options. Now double tap to select.",
+                "Good. Swipe changes options. Now, double tap does different things depending on which device you are using. If you are on the smartphone, it selects the current option or confirms a session to start. If you are on the smartwatch during a workout, it pauses or unpauses the session. Double tap to test.",
                 "guide_double_tap"
             )
 
             GuideStep.TWO_FINGER_BACK -> speak(
-                "Good. Double tap selects. Now swipe left or right with two fingers to go back.",
+                "Good. Double tap selects. Now, a two finger swipe left or right goes back. This only works on the smartphone. If you are setting up a new session, it takes you to the previous step. If you are in the progress or options screen, it takes you back to the menu. Swipe left or right with two fingers to test.",
                 "guide_two_finger_back"
             )
 
