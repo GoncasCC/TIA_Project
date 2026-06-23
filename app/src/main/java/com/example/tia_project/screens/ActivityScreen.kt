@@ -10,7 +10,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -95,9 +94,6 @@ fun GoalValueScreen(
 
 /**
  * Shared gesture-driven selector used by the setup screens.
- *
- * One-finger swipes cycle through options, double tap confirms, long press
- * cancels, and the optional two-finger gesture navigates back.
  */
 @Composable
 private fun OptionSelectionScreen(
@@ -190,7 +186,6 @@ private fun OptionSelectionScreen(
             .background(backgroundColor)
             .pointerInput(Unit) {
                 coroutineScope {
-
                     launch (start = CoroutineStart.UNDISPATCHED) {
                         detectTapGestures(
                             onTap = {},
@@ -713,7 +708,6 @@ fun SummaryScreen(
 
     val backgroundColor = if (darkModeEnabled) Color.Black else Color.White
     val safetyColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFF8A6A00)
-
     val accentColor = if (darkModeEnabled) Color(0xFFFFCC00) else Color(0xFFB71C1C)
 
     val difficultyColor = if (darkModeEnabled) {
@@ -855,8 +849,8 @@ fun SummaryScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (!confirmed || showTriangle) {
-            if (!confirmed && !showTriangle) {
+        if (!confirmed) {
+            if (!showTriangle) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -864,7 +858,6 @@ fun SummaryScreen(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-
                     Text(
                         text = goalValue.toDisplayGoalValue(),
                         color = if (darkModeEnabled) Color.White else Color.Black,
@@ -882,9 +875,7 @@ fun SummaryScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
-
-            if (showTriangle) {
+            } else {
                 androidx.compose.foundation.Canvas(modifier = Modifier.size(380.dp)) {
                     val path = androidx.compose.ui.graphics.Path().apply {
                         moveTo(size.width / 2f, size.height * 0.05f)
@@ -916,8 +907,7 @@ fun SummaryScreen(
                     )
                 }
             }
-        }
-        if (confirmed && !showTriangle) {
+        } else {
             var visible by remember { mutableStateOf(true) }
 
             LaunchedEffect(Unit) {
